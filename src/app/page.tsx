@@ -161,12 +161,12 @@ const ThemeSwitcher = () => {
     );
 };
 
+type AppState = 'loading' | 'ready' | 'error';
 
 export default function Home() {
+  const [appState, setAppState] = useState<AppState>('loading');
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [geoLoading, setGeoLoading] = useState(true);
   
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -179,8 +179,7 @@ export default function Home() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
-    if (!geoLoading) setGeoLoading(true);
-    if (loading) setLoading(true);
+    setAppState('loading');
     setError(null);
   
     try {
@@ -193,8 +192,7 @@ export default function Home() {
       const countryData = countries.find(c => c.code === countryCode);
 
       if (!countryData || !city) {
-        const errorMsg = countryData ? "تعذر تحديد المدينة من إحداثياتك." : "بلدك الذي تم اكتشافه غير مدعوم من قبل هذا التطبيق.";
-        throw new Error(errorMsg);
+        throw new Error("بلدك الذي تم اكتشافه غير مدعوم أو تعذر تحديد المدينة.");
       }
       
       const method = countryData.method;
@@ -213,28 +211,24 @@ export default function Home() {
       setSelectedCountry(countryData.name);
       setSelectedCity(city);
       setAvailableCities(countryData.cities);
+      setAppState('ready');
   
     } catch (e: any) {
       setError(e.message);
+      setAppState('error');
       toast({ variant: "destructive", title: "خطأ", description: e.message });
-    } finally {
-      setLoading(false);
-      setGeoLoading(false);
-      setIsLocationModalOpen(false);
     }
-  }, [toast, geoLoading, loading]);
+  }, [toast]);
 
-  const fetchPrayerTimesByCity = useCallback(async (city: string, countryCode: string) => {
-    setLoading(true);
+  const fetchPrayerTimesByCity = useCallback(async (city: string, countryName: string) => {
+    setAppState('loading');
     setError(null);
-    setGeoLoading(true);
 
     try {
-        const countryData = countries.find(c => c.code === countryCode);
+        const countryData = countries.find(c => c.name === countryName);
         if (!countryData) throw new Error("الدولة المحددة غير صالحة.");
 
-        const geoQuery = `${encodeURIComponent(city)},${encodeURIComponent(countryData.arabicName)}`;
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${geoQuery}&format=json&limit=1`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)},${encodeURIComponent(countryData.name)}`;
         
         const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'SalatApp/1.0' } });
         if (!nominatimRes.ok) throw new Error('فشل خدمة تحويل الموقع إلى إحداثيات.');
@@ -244,29 +238,30 @@ export default function Home() {
         
         const { lat, lon } = nominatimData[0];
         await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon));
+        setIsLocationModalOpen(false);
 
     } catch (e: any) {
         setError(e.message);
-        toast({ variant: "destructive", title: "خطأ", description: e.message, });
-        setLoading(false);
-        setGeoLoading(false);
-        setIsLocationModalOpen(false);
+        setAppState('error');
+        toast({ variant: "destructive", title: "خطأ", description: e.message });
     }
   }, [toast, fetchPrayerTimesFromCoords]);
-  
 
   useEffect(() => {
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        await fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude);
-      }, (error) => {
-        console.error("Geolocation permission failed:", error.message);
-        toast({ title: "تم رفض الوصول إلى الموقع", description: "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
-        setGeoLoading(false);
-      });
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          console.error("Geolocation permission failed:", error.message);
+          toast({ title: "تم رفض الوصول إلى الموقع", description: "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
+          setAppState('error');
+        }
+      );
     } else {
       toast({ title: "تحديد الموقع الجغرافي غير مدعوم", description: "يرجى تحديد موقعك يدويًا." });
-      setGeoLoading(false);
+      setAppState('error');
     }
   }, [fetchPrayerTimesFromCoords, toast]);
 
@@ -307,9 +302,8 @@ export default function Home() {
 
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    const countryData = countries.find(c => c.name === selectedCountry);
-    if (selectedCity && countryData) {
-      fetchPrayerTimesByCity(selectedCity, countryData.code);
+    if (selectedCity && selectedCountry) {
+      fetchPrayerTimesByCity(selectedCity, selectedCountry);
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
@@ -338,7 +332,7 @@ export default function Home() {
     }
   };
   
-  if (geoLoading) {
+  if (appState === 'loading') {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Loader2 className="w-16 h-16 animate-spin text-primary" />
@@ -347,7 +341,7 @@ export default function Home() {
     );
   }
 
-  if (!prayerData && !loading) {
+  if (appState === 'error' && !prayerData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
@@ -362,22 +356,13 @@ export default function Home() {
               selectedCountry={selectedCountry}
               selectedCity={selectedCity}
               availableCities={availableCities}
-              loading={loading}
+              loading={appState === 'loading'}
               handleCountryChange={handleCountryChange}
               handleCityChange={handleCityChange}
               handleManualLocationSubmit={handleManualLocationSubmit}
             />
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  if (loading && !prayerData) {
-    return (
-       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <Loader2 className="w-16 h-16 animate-spin text-primary" />
-        <p className="mt-4 text-lg font-semibold font-headline">جاري جلب أوقات الصلاة...</p>
       </div>
     );
   }
@@ -419,7 +404,7 @@ export default function Home() {
                     selectedCountry={selectedCountry}
                     selectedCity={selectedCity}
                     availableCities={availableCities}
-                    loading={loading}
+                    loading={appState === 'loading'}
                     handleCountryChange={handleCountryChange}
                     handleCityChange={handleCityChange}
                     handleManualLocationSubmit={handleManualLocationSubmit}
@@ -469,12 +454,14 @@ export default function Home() {
                 <CardTitle className="font-headline">إشعارات الصلاة</CardTitle>
                 <CardDescription>تلقي إشعارات لأوقات الصلاة.</CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <Label htmlFor="notifications" className="flex items-center gap-3 cursor-pointer">
-                 <Bell className="w-6 h-6 text-accent"/>
-                 <span className="text-lg font-semibold">تفعيل الإشعارات</span>
-              </Label>
-              <Switch id="notifications" checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} aria-label="تفعيل أو تعطيل إشعارات الصلاة" />
+            <CardContent>
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="notifications" className="flex items-center gap-3 cursor-pointer">
+                        <Bell className="w-6 h-6 text-accent"/>
+                        <span className="text-lg font-semibold">تفعيل الإشعارات</span>
+                    </Label>
+                    <Switch id="notifications" checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} aria-label="تفعيل أو تعطيل إشعارات الصلاة" />
+                </div>
             </CardContent>
           </Card>
           <Card className="shadow-md">
@@ -500,5 +487,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
