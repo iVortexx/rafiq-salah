@@ -63,6 +63,10 @@ const translations = {
     notificationNotSupportedDesc: "هذا المتصفح لا يدعم إشعارات سطح المكتب.",
     prayerTimeIn5Mins: (prayerName: string) => `صلاة ${prayerName} بعد 5 دقائق.`,
     prayerTimeNow: "حان وقت الصلاة",
+    locationAccessDenied: "تم رفض الوصول للموقع",
+    locationAccessDeniedDesc: "يرجى تحديد موقعك يدويًا لعرض أوقات الصلاة.",
+    geolocationNotSupported: "تحديد الموقع غير مدعوم",
+    geolocationNotSupportedDesc: "متصفحك لا يدعم هذه الميزة. يرجى تحديد موقعك يدويًا.",
   },
   en: {
     title: "Prayer Pal",
@@ -103,6 +107,10 @@ const translations = {
     notificationNotSupportedDesc: "This browser does not support desktop notifications.",
     prayerTimeIn5Mins: (prayerName: string) => `Time for ${prayerName} prayer in 5 minutes.`,
     prayerTimeNow: "Prayer Time",
+    locationAccessDenied: "Location Access Denied",
+    locationAccessDeniedDesc: "Please select your location manually to continue.",
+    geolocationNotSupported: "Geolocation Not Supported",
+    geolocationNotSupportedDesc: "Your browser does not support this feature. Please select your location manually.",
   }
 };
 
@@ -395,15 +403,17 @@ export default function Home() {
         },
         (error) => {
           console.error("Geolocation permission failed:", error.message);
-          toast({ title: "Location access denied", description: "Please select your location manually.", variant: "destructive" });
+          setError(t.locationAccessDeniedDesc);
+          toast({ title: t.locationAccessDenied, description: t.locationAccessDeniedDesc, variant: "destructive" });
           setAppState('geo-fallback');
         }
       );
     } else {
-      toast({ title: "Geolocation not supported", description: "Please select your location manually." });
+      setError(t.geolocationNotSupportedDesc);
+      toast({ title: t.geolocationNotSupported, description: t.geolocationNotSupportedDesc, variant: "destructive" });
       setAppState('geo-fallback');
     }
-  }, [fetchPrayerTimesFromCoords, toast]);
+  }, [fetchPrayerTimesFromCoords, toast, t]);
   
   useEffect(() => {
     if ('Notification' in window) {
