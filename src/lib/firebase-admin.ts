@@ -1,8 +1,11 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getMessaging } from 'firebase-admin/messaging';
 
 // Check if the app is already initialized to prevent errors
-if (!admin.apps.length) {
-  admin.initializeApp({
+if (!getApps().length) {
+  initializeApp({
     // The service account credentials can be automatically discovered
     // by the Firebase Admin SDK when deployed on Google Cloud environments
     // like Firebase App Hosting or Cloud Functions.
@@ -10,8 +13,8 @@ if (!admin.apps.length) {
   });
 }
 
-const firestore = admin.firestore();
-const auth = admin.auth();
-const messagingAdmin = admin.messaging();
+const firestore = getFirestore();
+const auth = getAuth();
+const messagingAdmin = getMessaging();
 
 export { firestore, auth, messagingAdmin };
