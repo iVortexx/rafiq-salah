@@ -73,6 +73,9 @@ export default function Home() {
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       setPrayerData(data.data);
       setDisplayLocation(`${city}, ${countryData.arabicName}`);
+      setSelectedCountry(countryData.name);
+      setSelectedCity(city);
+      setAvailableCities(countryData.cities);
 
     } catch (e: any) {
       setError(e.message);
@@ -90,20 +93,23 @@ export default function Home() {
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (position) => {
-        const { latitude, longitude } = position.coords;
         try {
+          const { latitude, longitude } = position.coords;
           const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
           const geoData = await geoResponse.json();
           const { countryName, city } = geoData;
-
+          
           const countryData = countries.find(c => c.name === countryName);
+
           if (countryData && city) {
             await fetchPrayerTimes(city, countryName);
           } else {
-            setGeoLoading(false);
+            toast({ title: "Could not determine location", description: "Please select your location manually."});
           }
         } catch (error) {
           console.error("Reverse geocoding failed", error);
+          toast({ title: "Could not determine location", description: "Please select your location manually.", variant: "destructive" });
+        } finally {
           setGeoLoading(false);
         }
       }, (error) => {
@@ -142,10 +148,16 @@ export default function Home() {
   }, [prayerList]);
 
   const handleCountryChange = (countryName: string) => {
-    setSelectedCountry(countryName);
-    const countryData = countries.find(c => c.name === countryName);
+    const countryValue = countries.find(c => c.name.toLowerCase() === countryName.toLowerCase())?.name || '';
+    setSelectedCountry(countryValue);
+    const countryData = countries.find(c => c.name === countryValue);
     setAvailableCities(countryData ? countryData.cities : []);
     setSelectedCity('');
+  };
+  
+  const handleCityChange = (cityName: string) => {
+      const cityValue = availableCities.find(c => c.toLowerCase() === cityName.toLowerCase()) || '';
+      setSelectedCity(cityValue);
   };
 
   const handleManualLocationSubmit = (e: React.FormEvent) => {
@@ -212,7 +224,7 @@ export default function Home() {
                            setCountryOpen(false);
                         }}
                       >
-                        <Check className={cn("mr-2 h-4 w-4", selectedCountry === country.name ? "opacity-100" : "opacity-0")} />
+                        <Check className={cn("mr-2 h-4 w-4", selectedCountry.toLowerCase() === country.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
                         {country.arabicName}
                       </CommandItem>
                     ))}
@@ -242,11 +254,11 @@ export default function Home() {
                         key={city}
                         value={city}
                         onSelect={(currentValue) => {
-                          setSelectedCity(currentValue);
+                          handleCityChange(currentValue);
                           setCityOpen(false);
                         }}
                       >
-                        <Check className={cn("mr-2 h-4 w-4", selectedCity === city ? "opacity-100" : "opacity-0")} />
+                        <Check className={cn("mr-2 h-4 w-4", selectedCity.toLowerCase() === city.toLowerCase() ? "opacity-100" : "opacity-0")} />
                         {city}
                       </CommandItem>
                     ))}
@@ -397,3 +409,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
