@@ -31,7 +31,14 @@ export function useNotifications(t: any) {
       const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
       if (currentToken) {
         console.log('FCM Token:', currentToken);
-        // TODO: Send this token to your backend server to trigger notifications.
+        // Send this token to your backend server to trigger notifications.
+        await fetch('/api/save-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: currentToken }),
+        });
         setNotificationsEnabled(true);
       } else {
         console.log('No registration token available. A new one may be generated on next permission request.');
