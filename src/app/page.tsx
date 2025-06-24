@@ -57,13 +57,11 @@ export default function Home() {
             selectedCountry={selectedCountry}
             selectedCity={selectedCity}
             availableCities={availableCities}
-            loading={appState === 'loading'}
             handleCountryChange={handleCountryChange}
             handleCityChange={handleCityChange}
             handleManualLocationSubmit={handleManualLocationSubmit}
             language={language}
-            translations={t}
-          />
+            translations={t} loading={false}          />
         )}
 
         {prayerData && (
@@ -83,6 +81,7 @@ export default function Home() {
             handleNotificationToggle={handleNotificationToggle}
             language={language}
             translations={t}
+            loading={appState === 'loading'}
             appState={appState}
           />
         )}
