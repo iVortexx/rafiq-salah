@@ -33,8 +33,6 @@ export async function checkAndSendPrayerNotifications() {
     }
   });
 
-  const now = new Date();
-
   for (const groupKey in locationGroups) {
     const [location, lang] = groupKey.split('|');
     const [city, country] = location.split(',').map(s => s.trim());
@@ -56,6 +54,7 @@ export async function checkAndSendPrayerNotifications() {
       }
       
       const method = countryData.method;
+      // Use the current date for the API call
       const today = new Date();
       const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
 
@@ -68,14 +67,18 @@ export async function checkAndSendPrayerNotifications() {
         continue;
       }
 
-      const { timings, date: dateInfo } = prayerData.data;
-      const midnightInLocation = new Date(parseInt(dateInfo.timestamp, 10) * 1000);
-
+      const { timings, meta } = prayerData.data;
+      
+      // Crucial: Create a date object representing the current moment *in the prayer's local timezone*.
+      const nowInLocationTimezone = new Date(new Date().toLocaleString('en-US', { timeZone: meta.timezone }));
+      
+      // Build a list of prayer times as Date objects for today, correctly grounded in the location's timezone.
       const prayerList = PRAYER_NAMES.map(name => {
           const timeString24 = timings[name as keyof typeof timings];
           const [hours, minutes] = timeString24.split(':').map(Number);
           
-          const prayerDate = new Date(midnightInLocation.getTime());
+          // Use the location's "today" to construct the prayer time, preventing timezone-off-by-one-day errors.
+          const prayerDate = new Date(nowInLocationTimezone); 
           prayerDate.setHours(hours, minutes, 0, 0);
 
           return {
@@ -85,13 +88,15 @@ export async function checkAndSendPrayerNotifications() {
           };
       });
       
-      const nextPrayer = findNextPrayer(prayerList, now);
+      // `findNextPrayer` now gets the correct current time for the location
+      const nextPrayer = findNextPrayer(prayerList, nowInLocationTimezone);
 
       if (nextPrayer) {
-        const timeToPrayer = nextPrayer.date.getTime() - now.getTime();
-        const minutesToPrayer = Math.round(timeToPrayer / (1000 * 60));
+        const timeToPrayer = nextPrayer.date.getTime() - nowInLocationTimezone.getTime();
+        const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
 
-        if (minutesToPrayer === 0) {
+        // Check if the next prayer is within our 5-minute notification window
+        if (timeToPrayer > 0 && timeToPrayer <= FIVE_MINUTES_IN_MS) {
           const { tokens } = locationGroups[groupKey];
           const t = translations[language];
 
@@ -109,15 +114,15 @@ export async function checkAndSendPrayerNotifications() {
             tokens: tokens,
           };
 
-          console.log(`Sending notification for ${nextPrayer.displayName} to ${tokens.length} users in ${location}`);
+          console.log(`Sending notification for ${nextPrayer.displayName} (in <5 mins) to ${tokens.length} users in ${location}`);
           const batchResponse = await messagingAdmin.sendEachForMulticast(messagePayload);
           
+          // Clean up invalid tokens after sending
           if (batchResponse.failureCount > 0) {
             const tokensToDelete: Promise<any>[] = [];
             batchResponse.responses.forEach((resp, idx) => {
               if (!resp.success) {
                 const errorCode = resp.error?.code;
-                // Check for errors indicating the token is no longer valid
                 if (errorCode === 'messaging/registration-token-not-registered') {
                   const failedToken = tokens[idx];
                   console.log(`Token ${failedToken} is no longer registered. Deleting.`);
