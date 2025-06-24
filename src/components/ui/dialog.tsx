@@ -38,7 +38,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       onPointerDownOutside={(e) => {
-        if (e.target?.closest('[cmdk-list]')) {
+        if (e.target?.closest('[data-radix-popover-content]')) {
           e.preventDefault()
         }
       }}

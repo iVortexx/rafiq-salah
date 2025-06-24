@@ -1,8 +1,8 @@
 import countriesData from '@/app/countries.json';
 
 export interface City {
-  name: string;
-  arabicName: string;
+  name: string; // English name for display
+  arabicName: string; // Arabic name for API and display
 }
 
 export interface Country {
@@ -39,16 +39,33 @@ const countryMethodMap: { [key: string]: number } = {
   'Tunisia': 7,                    // Tunis
 };
 
-const processedCountries: Country[] = countriesData.map((country) => ({
-  code: country.code,
-  name: country.english_name,
-  arabicName: country.name,
-  method: countryMethodMap[country.english_name] || 3, // Default to Muslim World League
-  cities: country.cities.map((city) => ({
-    name: city, // Use Arabic name for both API parameter and display
-    arabicName: city,
-  })).sort((a, b) => a.arabicName.localeCompare(b.arabicName, 'ar')), // Sort cities alphabetically
-}));
+const processedCountries: Country[] = countriesData.map((country) => {
+  const cities: City[] = (country.cities as Array<string | { ar: string; en: string }>).map((city) => {
+    if (typeof city === 'object' && city.ar && city.en) {
+      // New format: { ar: '..', en: '..' }
+      return {
+        name: city.en,
+        arabicName: city.ar,
+      };
+    }
+    // Old format: '...' (string)
+    // We'll use the Arabic name for both as a fallback.
+    const arabicCityName = city as string;
+    return {
+      name: arabicCityName, // Fallback to Arabic name for display
+      arabicName: arabicCityName,
+    };
+  }).sort((a, b) => a.arabicName.localeCompare(b.arabicName, 'ar'));
+
+  return {
+    code: country.code,
+    name: country.english_name,
+    arabicName: country.name,
+    method: countryMethodMap[country.english_name] || 3, // Default to Muslim World League
+    cities,
+  };
+});
+
 
 // Sort countries alphabetically by Arabic name
 export const countries: Country[] = processedCountries.sort((a, b) => a.arabicName.localeCompare(b.arabicName, 'ar'));

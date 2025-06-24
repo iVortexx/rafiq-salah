@@ -146,7 +146,7 @@ const LocationForm = memo(({
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>{t.country}</Label>
-        <Popover open={countryOpen} onOpenChange={setCountryOpen} modal={true}>
+        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
               {selectedCountryData ? (language === 'ar' ? selectedCountryData.arabicName : selectedCountryData.name) : t.selectCountry}
@@ -180,7 +180,7 @@ const LocationForm = memo(({
       </div>
       <div className="space-y-2">
         <Label>{t.city}</Label>
-        <Popover open={cityOpen} onOpenChange={setCityOpen} modal={true}>
+        <Popover open={cityOpen} onOpenChange={setCityOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
               {selectedCityData ? (language === 'ar' ? selectedCityData.arabicName : selectedCityData.name) : t.selectCity}
@@ -379,7 +379,10 @@ export default function Home() {
         const countryData = countries.find(c => c.name === countryName);
         if (!countryData) throw new Error("Invalid country selected.");
 
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)},${encodeURIComponent(countryData.name)}`;
+        const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
+        const cityForApi = cityData ? cityData.arabicName : city;
+
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityForApi)},${encodeURIComponent(countryData.name)}`;
         
         const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
         if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
@@ -503,7 +506,11 @@ export default function Home() {
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
-      fetchPrayerTimesByCity(selectedCity, selectedCountry);
+      const countryData = countries.find(c => c.name === selectedCountry);
+      const cityData = countryData?.cities.find(c => c.name === selectedCity);
+      // Use the Arabic name for the API call as it's more reliable with AlAdhan
+      const cityForApi = cityData ? cityData.arabicName : selectedCity;
+      fetchPrayerTimesByCity(cityForApi, selectedCountry);
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
