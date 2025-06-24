@@ -13,6 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // The lang, dir, and class attributes are now managed by the Header component via a hook.
+    // suppressHydrationWarning is needed to avoid warnings because the theme is set on the client.
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />

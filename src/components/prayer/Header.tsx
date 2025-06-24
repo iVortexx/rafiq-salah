@@ -1,7 +1,7 @@
 
 'use client';
 
-import { memo, useState, useEffect } from 'react';
+import { memo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Languages, ChevronDown, SunIcon, MoonIcon } from 'lucide-react';
@@ -26,12 +26,12 @@ const EgyptFlag = memo(() => (
 ));
 EgyptFlag.displayName = 'EgyptFlag';
 
-const LanguageSwitcher = memo(({ language, setLanguage }: { language: 'ar' | 'en', setLanguage: (lang: 'ar' | 'en') => void }) => {
-    const handleLanguageChange = (newLang: 'ar' | 'en') => {
-        setLanguage(newLang);
-        localStorage.setItem('language', newLang);
-    };
+interface LanguageSwitcherProps {
+  language: 'ar' | 'en';
+  setLanguage: (lang: 'ar' | 'en') => void;
+}
 
+const LanguageSwitcher = memo(({ language, setLanguage }: LanguageSwitcherProps) => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -42,11 +42,11 @@ const LanguageSwitcher = memo(({ language, setLanguage }: { language: 'ar' | 'en
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleLanguageChange('en')} className="gap-2 cursor-pointer">
+                <DropdownMenuItem onClick={() => setLanguage('en')} className="gap-2 cursor-pointer">
                     <USFlag />
                     <span>English</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleLanguageChange('ar')} className="gap-2 cursor-pointer">
+                <DropdownMenuItem onClick={() => setLanguage('ar')} className="gap-2 cursor-pointer">
                     <EgyptFlag />
                     <span>العربية</span>
                 </DropdownMenuItem>
@@ -56,20 +56,15 @@ const LanguageSwitcher = memo(({ language, setLanguage }: { language: 'ar' | 'en
 });
 LanguageSwitcher.displayName = 'LanguageSwitcher';
 
-const ThemeSwitcher = memo(() => {
-    const [theme, setTheme] = useState('light');
+interface ThemeSwitcherProps {
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+}
 
-    useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        setTheme(savedTheme);
-        // Initial theme is set in page.tsx useEffect
-    }, []);
-
+const ThemeSwitcher = memo(({ theme, setTheme }: ThemeSwitcherProps) => {
     const toggleTheme = () => {
         const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
-        localStorage.setItem('theme', newTheme);
-        document.documentElement.classList.toggle('dark', newTheme === 'dark');
     };
 
     return (
@@ -82,14 +77,26 @@ const ThemeSwitcher = memo(() => {
 });
 ThemeSwitcher.displayName = 'ThemeSwitcher';
 
+interface HeaderProps extends LanguageSwitcherProps, ThemeSwitcherProps {
+  title: string;
+}
 
-export const Header = memo(({ title, language, setLanguage }: { title: string; language: 'ar' | 'en'; setLanguage: (lang: 'ar' | 'en') => void }) => {
+export const Header = memo(({ title, language, setLanguage, theme, setTheme }: HeaderProps) => {
+    useEffect(() => {
+        document.documentElement.lang = language;
+        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    }, [language]);
+
+    useEffect(() => {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+    }, [theme]);
+
     return (
         <header className="container mx-auto px-4 py-4 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-primary">{title}</h1>
             <div className='flex items-center gap-2'>
                 <LanguageSwitcher language={language} setLanguage={setLanguage} />
-                <ThemeSwitcher />
+                <ThemeSwitcher theme={theme} setTheme={setTheme} />
             </div>
       </header>
     );

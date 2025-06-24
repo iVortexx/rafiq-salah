@@ -42,6 +42,9 @@ export const LocationForm = memo(({
     if (!selectedCity) return null;
     return availableCities.find(c => c.name === selectedCity || c.arabicName === selectedCity);
   }, [availableCities, selectedCity]);
+  
+  const getCountryDisplayName = (country: typeof countries[0]) => language === 'ar' ? country.arabicName : country.name;
+  const getCityDisplayName = (city: City) => language === 'ar' ? city.arabicName : city.name;
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
@@ -50,7 +53,7 @@ export const LocationForm = memo(({
         <Popover open={countryOpen} onOpenChange={setCountryOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
-              {selectedCountryData ? (language === 'ar' ? selectedCountryData.arabicName : selectedCountryData.name) : t.selectCountry}
+              {selectedCountryData ? getCountryDisplayName(selectedCountryData) : t.selectCountry}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -61,17 +64,17 @@ export const LocationForm = memo(({
                 <CommandEmpty>{t.countryNotFound}</CommandEmpty>
                 <CommandGroup>
                   {countries.map((country) => {
-                    const countryDisplayName = language === 'ar' ? country.arabicName : country.name;
+                    const countryDisplayName = getCountryDisplayName(country);
                     return (
                       <CommandItem
-                        key={country.name}
+                        key={country.code}
                         value={countryDisplayName}
                         onSelect={(currentValue) => {
                            handleCountryChange(currentValue);
                            setCountryOpen(false);
                         }}
                       >
-                        <Check className={cn("me-2 h-4 w-4", (selectedCountryData?.name === country.name || selectedCountryData?.arabicName === country.arabicName) ? "opacity-100" : "opacity-0")} />
+                        <Check className={cn("me-2 h-4 w-4", (selectedCountryData && getCountryDisplayName(selectedCountryData) === countryDisplayName) ? "opacity-100" : "opacity-0")} />
                         {countryDisplayName}
                       </CommandItem>
                     )
@@ -87,7 +90,7 @@ export const LocationForm = memo(({
         <Popover open={cityOpen} onOpenChange={setCityOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCityData ? (language === 'ar' ? selectedCityData.arabicName : selectedCityData.name) : t.selectCity}
+              {selectedCityData ? getCityDisplayName(selectedCityData) : t.selectCity}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -98,7 +101,7 @@ export const LocationForm = memo(({
                 <CommandEmpty>{t.cityNotFound}</CommandEmpty>
                 <CommandGroup>
                   {availableCities.map((city) => {
-                    const cityDisplayName = language === 'ar' ? city.arabicName : city.name;
+                    const cityDisplayName = getCityDisplayName(city);
                     return (
                       <CommandItem
                         key={city.name}
@@ -108,7 +111,7 @@ export const LocationForm = memo(({
                           setCityOpen(false);
                         }}
                       >
-                        <Check className={cn("me-2 h-4 w-4", (selectedCityData?.name === city.name || selectedCityData?.arabicName === city.arabicName) ? "opacity-100" : "opacity-0")} />
+                        <Check className={cn("me-2 h-4 w-4", (selectedCityData && getCityDisplayName(selectedCityData) === cityDisplayName) ? "opacity-100" : "opacity-0")} />
                         {cityDisplayName}
                       </CommandItem>
                     )
