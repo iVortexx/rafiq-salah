@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { checkAndSendPrayerNotifications } from '@/lib/prayer-notifications';
@@ -7,10 +8,12 @@ import { checkAndSendPrayerNotifications } from '@/lib/prayer-notifications';
 export async function GET(request: Request) {
   const headersList = headers();
   const authHeader = headersList.get('authorization');
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const cronSecret = process.env.CRON_SECRET;
 
-  // When deployed to Vercel, the CRON_SECRET environment variable must be set.
-  // The cron job will send a request with an Authorization header.
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // For production, the cron secret must be provided and must match.
+  // In development, we bypass this check for easier manual testing.
+  if (!isDevelopment && (!cronSecret || authHeader !== `Bearer ${cronSecret}`)) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 

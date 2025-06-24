@@ -91,7 +91,7 @@ export async function checkAndSendPrayerNotifications() {
         const timeToPrayer = nextPrayer.date.getTime() - now.getTime();
         const minutesToPrayer = Math.round(timeToPrayer / (1000 * 60));
 
-        if (minutesToPrayer === 5) {
+        if (minutesToPrayer === 0) {
           const { tokens } = locationGroups[groupKey];
           const t = translations[language];
 
