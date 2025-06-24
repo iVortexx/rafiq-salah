@@ -71,11 +71,14 @@ export const PrayerTimesView = ({
   }, [prayerData, language]);
 
   const { nextPrayer, countdown } = useMemo(() => {
-    if (!prayerList.length) return { nextPrayer: null, countdown: '00:00:00' };
+    // Wait until client-side time is available to prevent hydration mismatch
+    if (!prayerList.length || !currentTime) {
+      return { nextPrayer: null, countdown: '00:00:00' };
+    }
     const next = findNextPrayer(prayerList, currentTime);
     const diff = next ? next.date.getTime() - currentTime.getTime() : 0;
     return {
-      nextPrayer: next as Prayer,
+      nextPrayer: next,
       countdown: formatCountdown(diff),
     };
   }, [prayerList, currentTime]);
