@@ -140,7 +140,10 @@ const LocationForm = memo(({
   const t = translations[language];
 
   const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
-  const selectedCityData = useMemo(() => availableCities.find(c => c.en.toLowerCase() === selectedCity.toLowerCase()), [availableCities, selectedCity]);
+  const selectedCityData = useMemo(() => {
+    if (!selectedCity) return null;
+    return availableCities.find(c => c.name.toLowerCase() === selectedCity.toLowerCase());
+  }, [availableCities, selectedCity]);
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
@@ -183,7 +186,7 @@ const LocationForm = memo(({
         <Popover open={cityOpen} onOpenChange={setCityOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCityData ? (language === 'ar' ? selectedCityData.ar : selectedCityData.en) : t.selectCity}
+              {selectedCityData ? (language === 'ar' ? selectedCityData.arabicName : selectedCityData.name) : t.selectCity}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -195,15 +198,15 @@ const LocationForm = memo(({
                 <CommandGroup>
                   {availableCities.map((city) => (
                     <CommandItem
-                      key={city.en}
-                      value={language === 'ar' ? city.ar : city.en}
+                      key={city.name}
+                      value={language === 'ar' ? city.arabicName : city.name}
                       onSelect={(currentValue) => {
                         handleCityChange(currentValue);
                         setCityOpen(false);
                       }}
                     >
-                      <Check className={cn("me-2 h-4 w-4", selectedCity.toLowerCase() === city.en.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                      {language === 'ar' ? city.ar : city.en}
+                      <Check className={cn("me-2 h-4 w-4", selectedCity.toLowerCase() === city.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                      {language === 'ar' ? city.arabicName : city.name}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -358,8 +361,8 @@ export default function Home() {
       
       setPrayerData(data.data);
       const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
-      const cityData = countryData.cities.find(c => c.en.toLowerCase() === city.toLowerCase());
-      const cityDisplayName = language === 'ar' ? cityData?.ar || city : cityData?.en || city;
+      const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
+      const cityDisplayName = language === 'ar' ? cityData?.arabicName || city : cityData?.name || city;
       
       setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
       setSelectedCountry(countryData.name);
@@ -382,17 +385,17 @@ export default function Home() {
         const countryData = countries.find(c => c.name === countryName);
         if (!countryData) throw new Error("Invalid country selected.");
 
-        const cityData = countryData.cities.find(c => c.en.toLowerCase() === city.toLowerCase() || c.ar === city);
+        const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase() || c.arabicName === city);
         if (!cityData) throw new Error("Invalid city selected.");
 
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityData.en)},${encodeURIComponent(countryData.name)}`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityData.name)},${encodeURIComponent(countryData.name)}`;
         
         const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
         if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
         
         const nominatimData = await nominatimRes.json();
         if (nominatimData.length === 0) {
-            throw new Error(`Could not find coordinates for ${cityData.en}.`);
+            throw new Error(`Could not find coordinates for ${cityData.name}.`);
         }
         
         const { lat, lon } = nominatimData[0];
@@ -503,9 +506,9 @@ export default function Home() {
   }, []);
   
   const handleCityChange = useCallback((cityName: string) => {
-      const cityData = availableCities.find(c => c.en === cityName || c.ar === cityName);
+      const cityData = availableCities.find(c => c.name === cityName || c.arabicName === cityName);
       if (cityData) {
-          setSelectedCity(cityData.en);
+          setSelectedCity(cityData.name);
       }
   }, [availableCities]);
 
@@ -513,8 +516,8 @@ export default function Home() {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
       const countryData = countries.find(c => c.name === selectedCountry);
-      const cityData = countryData?.cities.find(c => c.en.toLowerCase() === selectedCity.toLowerCase());
-      const cityForApi = cityData ? cityData.ar : selectedCity;
+      const cityData = countryData?.cities.find(c => c.name.toLowerCase() === selectedCity.toLowerCase());
+      const cityForApi = cityData ? cityData.arabicName : selectedCity;
       fetchPrayerTimesByCity(cityForApi, selectedCountry);
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
