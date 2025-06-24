@@ -401,8 +401,7 @@ export default function Home() {
         (position) => {
           fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude);
         },
-        (error) => {
-          console.error("Geolocation permission failed:", error.message);
+        () => {
           setError(t.locationAccessDeniedDesc);
           toast({ title: t.locationAccessDenied, description: t.locationAccessDeniedDesc, variant: "destructive" });
           setAppState('geo-fallback');
@@ -532,7 +531,6 @@ export default function Home() {
             toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
         }
     } catch (error) {
-        console.error("Error requesting notification permission:", error);
         setNotificationsEnabled(false);
         toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
     }
