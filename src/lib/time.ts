@@ -32,16 +32,16 @@ function formatTo12Hour(timeString: string, lang: 'ar' | 'en'): string {
 }
 
 export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 'ar' | 'en'): Prayer[] {
-  // Use the UTC timestamp for midnight at the location to ensure timezone correctness.
-  const midnightTimestamp = parseInt(dateInfo.timestamp, 10) * 1000;
-
   return PRAYER_NAMES.map(name => {
     const timeString24 = timings[name];
     const [hours, minutes] = timeString24.split(':').map(Number);
     
-    // Calculate the prayer's exact UTC timestamp by adding its time to the midnight timestamp.
-    const prayerTimestamp = midnightTimestamp + (hours * 3600 * 1000) + (minutes * 60 * 1000);
-    const prayerDate = new Date(prayerTimestamp);
+    // Create a new Date object representing today in the user's timezone.
+    const prayerDate = new Date(); 
+    // Set the time of this Date object to the prayer's time.
+    // This correctly grounds the prayer time in the user's current day context,
+    // avoiding timezone complexities from the API's timestamp.
+    prayerDate.setHours(Number(hours), Number(minutes), 0, 0); 
 
     return { 
       name, 
