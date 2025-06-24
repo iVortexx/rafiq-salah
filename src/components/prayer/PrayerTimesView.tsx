@@ -10,7 +10,7 @@ import { LocationDisplay } from './LocationDisplay';
 import { NextPrayerCard } from './NextPrayerCard';
 import { PrayerGrid } from './PrayerGrid';
 import { Settings } from './Settings';
-import type { LocationFormProps } from './LocationForm';
+import type { LocationFormProps } from '@/components/prayer/LocationForm';
 
 interface PrayerTimesViewProps extends Omit<LocationFormProps, 'translations'> {
   prayerData: PrayerData;
@@ -55,12 +55,14 @@ export const PrayerTimesView = ({
     if (!prayerData) return "";
     const { date } = prayerData;
     const locale = language === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US-u-ca-islamic';
+    // Use the reliable timestamp to create the date object
+    const dateObj = new Date(parseInt(date.timestamp, 10) * 1000);
     return new Intl.DateTimeFormat(locale, {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric',
-    }).format(new Date(date.hijri.date));
+    }).format(dateObj);
   }, [prayerData, language]);
 
   const prayerList = useMemo(() => {
