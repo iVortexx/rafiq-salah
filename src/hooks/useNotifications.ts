@@ -40,10 +40,10 @@ export function useNotifications(t: any, location: string, language: 'ar' | 'en'
       }
     } catch (err) {
       console.error('An error occurred while retrieving FCM token. ', err);
-      toast({ variant: "destructive", title: t.notificationError, description: "Could not get notification token. Ensure your VAPID key is correct." });
+      toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
       setNotificationsEnabled(false);
     }
-  }, [VAPID_KEY, location, language, t.notificationError, toast]);
+  }, [VAPID_KEY, location, language, t, toast]);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -63,6 +63,7 @@ export function useNotifications(t: any, location: string, language: 'ar' | 'en'
         // Here you might want to call a backend endpoint to delete the token
         // For simplicity, we'll just disable it on the client
         setNotificationsEnabled(false);
+        toast({ title: t.notificationDisabled, description: t.notificationDisabledDesc });
         return;
     }
 
@@ -76,6 +77,8 @@ export function useNotifications(t: any, location: string, language: 'ar' | 'en'
       return;
     }
 
+    // Allow re-requesting/re-registering even if already granted,
+    // to update location or other details on the backend.
     if (notificationStatus === 'denied') {
         toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
         return;
