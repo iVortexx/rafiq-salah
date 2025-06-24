@@ -59,7 +59,6 @@ export default function Home() {
     notificationsEnabled,
     notificationStatus,
     handleNotificationToggle,
-    language,
     translations: t,
     ...locationFormProps,
     appState: appState,
