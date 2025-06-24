@@ -6,6 +6,7 @@ export interface City {
 }
 
 export interface Country {
+  code: string;
   name: string; // English name for API
   arabicName: string; // Arabic name for display
   method: number; // AlAdhan API method ID
@@ -39,6 +40,7 @@ const countryMethodMap: { [key: string]: number } = {
 };
 
 const processedCountries: Country[] = countriesData.map((country) => ({
+  code: country.code,
   name: country.english_name,
   arabicName: country.name,
   method: countryMethodMap[country.english_name] || 3, // Default to Muslim World League

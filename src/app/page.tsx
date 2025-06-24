@@ -159,11 +159,11 @@ export default function Home() {
 
     const countryData = countries.find(c => c.name === countryName);
     if (!countryData) {
-        const msg = 'Your detected country is not supported by this app.';
+        const msg = 'The selected country is not supported by this app.';
         setError(msg);
         toast({ variant: "destructive", title: "Location Not Supported", description: msg });
         setLoading(false);
-        setGeoLoading(false); // Fix: Ensure geoLoading is set to false
+        setGeoLoading(false);
         return;
     }
 
@@ -179,7 +179,7 @@ export default function Home() {
       const data: AladhanResponse = await response.json();
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       
-      const cityData = countryData.cities.find(c => c.name === city);
+      const cityData = countryData.cities.find(c => c.arabicName === city);
       
       setPrayerData(data.data);
       setDisplayLocation(`${cityData?.arabicName || city}, ${countryData.arabicName}`);
@@ -213,17 +213,22 @@ export default function Home() {
           }
           const geoData = await geoResponse.json();
           
-          const countryName = geoData.countryName;
-          const city = geoData.city || geoData.locality; // Use city, fallback to locality for better results
+          const countryCode = geoData.countryCode;
+          const city = geoData.city || geoData.locality;
 
-          if (countryName && city) {
-             await fetchPrayerTimes(city, countryName);
+          const detectedCountry = countries.find(c => c.code === countryCode);
+
+          if (detectedCountry && city) {
+             await fetchPrayerTimes(city, detectedCountry.name);
           } else {
-            throw new Error("Could not determine city and country from your coordinates.");
+             const errorMsg = detectedCountry 
+                ? "Could not determine city from your coordinates." 
+                : "Your detected country is not supported by this app.";
+             throw new Error(errorMsg);
           }
         } catch (error: any) {
           console.error("Geolocation or fetch process failed:", error);
-          toast({ title: "Could not determine location", description: "Please select your location manually.", variant: "destructive" });
+          toast({ title: "Could not auto-detect location", description: error.message || "Please select your location manually.", variant: "destructive" });
           setGeoLoading(false);
         }
       }, (error) => {
@@ -236,7 +241,7 @@ export default function Home() {
       setGeoLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Intentionally empty to run only once
+  }, [fetchPrayerTimes]); // Added fetchPrayerTimes dependency
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
