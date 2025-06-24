@@ -1,35 +1,32 @@
 
-// This file must be in the public folder.
-// Scripts for service workers must be simple and cannot use JSX.
+// This file needs to be in the public directory.
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
+// Import the Firebase scripts
+importScripts("https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js");
+importScripts("https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js");
 
-// TODO: Replace this with your own Firebase configuration from the Firebase Console!
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+// Import the configuration from our dynamic endpoint
+importScripts('/firebase-config.js');
 
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+// Initialize Firebase
+if (self.firebaseConfig) {
+  firebase.initializeApp(self.firebaseConfig);
+  const messaging = firebase.messaging();
 
-onBackgroundMessage(messaging, (payload) => {
-  console.log(
-    "[firebase-messaging-sw.js] Received background message ",
-    payload
-  );
-  
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    // You can add an icon here, e.g. icon: '/logo.png'
-  };
+  messaging.onBackgroundMessage((payload) => {
+    console.log(
+      "[firebase-messaging-sw.js] Received background message ",
+      payload
+    );
+    // Customize notification here
+    const notificationTitle = payload.notification.title;
+    const notificationOptions = {
+      body: payload.notification.body,
+      icon: "/favicon.ico",
+    };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+    self.registration.showNotification(notificationTitle, notificationOptions);
+  });
+} else {
+    console.error("Firebase config not loaded in service worker. Notifications will not work.");
+}
