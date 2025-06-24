@@ -73,16 +73,19 @@ export async function checkAndSendPrayerNotifications(testOffsetMinutes?: number
         continue;
       }
 
-      const { timings, meta } = prayerData.data;
+      const { timings, date: dateInfo } = prayerData.data;
       
-      // Crucial: Create a date object representing the current moment *in the prayer's local timezone*.
-      const nowInLocationTimezone = new Date(new Date().toLocaleString('en-US', { timeZone: meta.timezone }));
+      // The timestamp from the API is the most reliable source for the prayer date.
+      // It represents midnight of that day in the location's timezone.
+      const locationDateForPrayers = new Date(parseInt(dateInfo.timestamp, 10) * 1000);
+      const prayerList = getPrayerListForDate(timings, locationDateForPrayers, language);
       
-      const prayerList = getPrayerListForDate(timings, nowInLocationTimezone, language);
-      const nextPrayer = findNextPrayer(prayerList, nowInLocationTimezone);
+      // All JS dates are UTC-based, so this comparison is reliable.
+      const now = new Date();
+      const nextPrayer = findNextPrayer(prayerList, now);
 
       if (nextPrayer) {
-        const timeToPrayer = nextPrayer.date.getTime() - nowInLocationTimezone.getTime();
+        const timeToPrayer = nextPrayer.date.getTime() - now.getTime();
 
         // Check if the next prayer is within our notification window
         if (timeToPrayer > 0 && timeToPrayer <= NOTIFICATION_WINDOW_MS) {
@@ -116,9 +119,11 @@ export async function checkAndSendPrayerNotifications(testOffsetMinutes?: number
             batchResponse.responses.forEach((resp, idx) => {
               if (!resp.success) {
                 const errorCode = resp.error?.code;
-                if (errorCode === 'messaging/registration-token-not-registered') {
+                // These error codes indicate that the token is no longer valid.
+                if (errorCode === 'messaging/registration-token-not-registered' || 
+                    errorCode === 'messaging/invalid-registration-token') {
                   const failedToken = tokens[idx];
-                  console.log(`Token ${failedToken} is no longer registered. Deleting.`);
+                  console.log(`Token ${failedToken.substring(0,10)}... is no longer registered. Deleting.`);
                   tokensToDelete.push(firestore.collection('fcmTokens').doc(failedToken).delete());
                 }
               }
