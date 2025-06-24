@@ -140,13 +140,13 @@ const LocationForm = memo(({
   const t = translations[language];
 
   const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
-  const selectedCityData = useMemo(() => availableCities.find(c => c.name.toLowerCase() === selectedCity.toLowerCase()), [availableCities, selectedCity]);
+  const selectedCityData = useMemo(() => availableCities.find(c => c.en.toLowerCase() === selectedCity.toLowerCase()), [availableCities, selectedCity]);
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>{t.country}</Label>
-        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+        <Popover open={countryOpen} onOpenChange={setCountryOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
               {selectedCountryData ? (language === 'ar' ? selectedCountryData.arabicName : selectedCountryData.name) : t.selectCountry}
@@ -168,7 +168,7 @@ const LocationForm = memo(({
                          setCountryOpen(false);
                       }}
                     >
-                      <Check className={cn("me-2 h-4 w-4", selectedCountry === country.name ? "opacity-100" : "opacity-0")} />
+                      <Check className={cn("me-2 h-4 w-4", (language === 'ar' ? selectedCountryData?.arabicName === country.arabicName : selectedCountryData?.name === country.name) ? "opacity-100" : "opacity-0")} />
                       {language === 'ar' ? country.arabicName : country.name}
                     </CommandItem>
                   ))}
@@ -180,10 +180,10 @@ const LocationForm = memo(({
       </div>
       <div className="space-y-2">
         <Label>{t.city}</Label>
-        <Popover open={cityOpen} onOpenChange={setCityOpen}>
+        <Popover open={cityOpen} onOpenChange={setCityOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCityData ? (language === 'ar' ? selectedCityData.arabicName : selectedCityData.name) : t.selectCity}
+              {selectedCityData ? (language === 'ar' ? selectedCityData.ar : selectedCityData.en) : t.selectCity}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -195,15 +195,15 @@ const LocationForm = memo(({
                 <CommandGroup>
                   {availableCities.map((city) => (
                     <CommandItem
-                      key={city.name}
-                      value={city.name}
+                      key={city.en}
+                      value={language === 'ar' ? city.ar : city.en}
                       onSelect={(currentValue) => {
                         handleCityChange(currentValue);
                         setCityOpen(false);
                       }}
                     >
-                      <Check className={cn("me-2 h-4 w-4", selectedCity.toLowerCase() === city.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                      {language === 'ar' ? city.arabicName : city.name}
+                      <Check className={cn("me-2 h-4 w-4", selectedCity.toLowerCase() === city.en.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                      {language === 'ar' ? city.ar : city.en}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -358,7 +358,10 @@ export default function Home() {
       
       setPrayerData(data.data);
       const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
-      setDisplayLocation(`${city}, ${countryDisplayName}`);
+      const cityData = countryData.cities.find(c => c.en.toLowerCase() === city.toLowerCase());
+      const cityDisplayName = language === 'ar' ? cityData?.ar || city : cityData?.en || city;
+      
+      setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
       setSelectedCountry(countryData.name);
       setSelectedCity(city);
       setAvailableCities(countryData.cities);
@@ -379,17 +382,17 @@ export default function Home() {
         const countryData = countries.find(c => c.name === countryName);
         if (!countryData) throw new Error("Invalid country selected.");
 
-        const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
-        const cityForApi = cityData ? cityData.arabicName : city;
+        const cityData = countryData.cities.find(c => c.en.toLowerCase() === city.toLowerCase() || c.ar === city);
+        if (!cityData) throw new Error("Invalid city selected.");
 
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityForApi)},${encodeURIComponent(countryData.name)}`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityData.en)},${encodeURIComponent(countryData.name)}`;
         
         const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
         if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
         
         const nominatimData = await nominatimRes.json();
         if (nominatimData.length === 0) {
-            throw new Error(`Could not find coordinates for ${city}.`);
+            throw new Error(`Could not find coordinates for ${cityData.en}.`);
         }
         
         const { lat, lon } = nominatimData[0];
@@ -491,7 +494,7 @@ export default function Home() {
   }, [prayerList]);
 
   const handleCountryChange = useCallback((countryIdentifier: string) => {
-    const countryData = countries.find(c => c.name.toLowerCase() === countryIdentifier.toLowerCase() || c.arabicName === countryIdentifier);
+    const countryData = countries.find(c => c.name === countryIdentifier || c.arabicName === countryIdentifier);
     if (countryData) {
         setSelectedCountry(countryData.name);
         setAvailableCities(countryData.cities);
@@ -500,23 +503,23 @@ export default function Home() {
   }, []);
   
   const handleCityChange = useCallback((cityName: string) => {
-      setSelectedCity(cityName);
-  }, []);
+      const cityData = availableCities.find(c => c.en === cityName || c.ar === cityName);
+      if (cityData) {
+          setSelectedCity(cityData.en);
+      }
+  }, [availableCities]);
 
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
       const countryData = countries.find(c => c.name === selectedCountry);
-      const cityData = countryData?.cities.find(c => c.name === selectedCity);
-      // Use the Arabic name for the API call as it's more reliable with AlAdhan
-      const cityForApi = cityData ? cityData.arabicName : selectedCity;
+      const cityData = countryData?.cities.find(c => c.en.toLowerCase() === selectedCity.toLowerCase());
+      const cityForApi = cityData ? cityData.ar : selectedCity;
       fetchPrayerTimesByCity(cityForApi, selectedCountry);
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (checked: boolean) => {
-    if (!checked) return;
-
     if (!('Notification' in window)) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
         return;
@@ -533,19 +536,21 @@ export default function Home() {
         return;
     }
 
-    try {
-        const permission = await Notification.requestPermission();
-        setNotificationStatus(permission);
-        if (permission === 'granted') {
-            setNotificationsEnabled(true);
-            toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
-        } else {
+    if (checked) {
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationStatus(permission);
+            if (permission === 'granted') {
+                setNotificationsEnabled(true);
+                toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
+            } else {
+                setNotificationsEnabled(false);
+                toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
+            }
+        } catch (error) {
             setNotificationsEnabled(false);
-            toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
+            toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
         }
-    } catch (error) {
-        setNotificationsEnabled(false);
-        toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
     }
   };
   
@@ -688,7 +693,7 @@ export default function Home() {
                       id="notifications" 
                       checked={notificationsEnabled} 
                       onCheckedChange={handleNotificationToggle}
-                      disabled={notificationStatus === 'granted' || notificationStatus === 'denied'}
+                      disabled={notificationStatus === 'granted'}
                       aria-label="Enable prayer notifications" 
                     />
                 </div>
