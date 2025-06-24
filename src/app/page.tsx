@@ -140,12 +140,13 @@ const LocationForm = memo(({
   const t = translations[language];
 
   const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
+  const selectedCityData = useMemo(() => availableCities.find(c => c.name.toLowerCase() === selectedCity.toLowerCase()), [availableCities, selectedCity]);
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>{t.country}</Label>
-        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+        <Popover open={countryOpen} onOpenChange={setCountryOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
               {selectedCountryData ? (language === 'ar' ? selectedCountryData.arabicName : selectedCountryData.name) : t.selectCountry}
@@ -179,10 +180,10 @@ const LocationForm = memo(({
       </div>
       <div className="space-y-2">
         <Label>{t.city}</Label>
-        <Popover open={cityOpen} onOpenChange={setCityOpen}>
+        <Popover open={cityOpen} onOpenChange={setCityOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCity || t.selectCity}
+              {selectedCityData ? (language === 'ar' ? selectedCityData.arabicName : selectedCityData.name) : t.selectCity}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -202,7 +203,7 @@ const LocationForm = memo(({
                       }}
                     >
                       <Check className={cn("me-2 h-4 w-4", selectedCity.toLowerCase() === city.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                      {city.arabicName}
+                      {language === 'ar' ? city.arabicName : city.name}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -330,7 +331,7 @@ export default function Home() {
     setError(null);
   
     try {
-      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${language}`);
+      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
       if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
       
       const geoData = await geoResponse.json();
@@ -339,7 +340,9 @@ export default function Home() {
       const countryData = countries.find(c => c.code === countryCode);
 
       if (!countryData || !city) {
-        throw new Error("Your detected country is not supported or city could not be determined.");
+        setAppState('geo-fallback');
+        setError("Your detected country is not supported or city could not be determined.");
+        return;
       }
       
       const method = countryData.method;
@@ -382,7 +385,9 @@ export default function Home() {
         if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
         
         const nominatimData = await nominatimRes.json();
-        if (nominatimData.length === 0) throw new Error(`Could not find coordinates for ${city}.`);
+        if (nominatimData.length === 0) {
+            throw new Error(`Could not find coordinates for ${city}.`);
+        }
         
         const { lat, lon } = nominatimData[0];
         await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon));
@@ -503,24 +508,21 @@ export default function Home() {
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (checked: boolean) => {
-    setNotificationsEnabled(checked);
     if (!checked) return;
 
     if (!('Notification' in window)) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
-        setNotificationsEnabled(false);
         return;
     }
 
     if (notificationStatus === 'granted') {
-        toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
         setNotificationsEnabled(true);
+        toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
         return;
     }
 
     if (notificationStatus === 'denied') {
         toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
-        setNotificationsEnabled(false);
         return;
     }
 
@@ -556,7 +558,7 @@ export default function Home() {
           <CardHeader>
             <CardTitle className="font-bold text-center text-3xl text-primary">{t.welcome}</CardTitle>
             <CardDescription className="text-center text-muted-foreground pt-2">
-              {error ? error : t.manualLocationPrompt}
+              {error || t.manualLocationPrompt}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -679,7 +681,7 @@ export default function Home() {
                       id="notifications" 
                       checked={notificationsEnabled} 
                       onCheckedChange={handleNotificationToggle}
-                      disabled={notificationsEnabled || notificationStatus === 'denied'}
+                      disabled={notificationStatus === 'granted' || notificationStatus === 'denied'}
                       aria-label="Enable prayer notifications" 
                     />
                 </div>
