@@ -357,6 +357,7 @@ export default function Home() {
           return;
         }
         
+        // Find the closest city from our list to the one from the geo API
         matchedCityData = countryData.cities.find(c => c.name.toLowerCase() === apiCity.toLowerCase());
 
         if (!matchedCityData) {
@@ -379,7 +380,7 @@ export default function Home() {
       const today = new Date();
       const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
       
-      const url = `https://api.aladhan.com/v1/timings/${dateString}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+      const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${matchedCityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
   
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch prayer times. Please check your internet connection.');
@@ -403,38 +404,47 @@ export default function Home() {
       toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
   }, [toast, t.notificationError, language, t.manualLocationPrompt, t.cityNotMatched]);
-
+  
   const fetchPrayerTimesByCity = useCallback(async (city: string, countryName: string) => {
     setAppState('loading');
     setError(null);
-
+  
     try {
-        const countryData = countries.find(c => c.name === countryName);
-        if (!countryData) throw new Error("Invalid country selected.");
-
-        const cityData = countryData.cities.find(c => c.name === city);
-        if (!cityData) throw new Error("Invalid city selected.");
-
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityData.name)},${encodeURIComponent(countryData.name)}`;
-        
-        const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
-        if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
-        
-        const nominatimData = await nominatimRes.json();
-        if (nominatimData.length === 0) {
-            throw new Error(`Could not find coordinates for ${cityData.name}.`);
-        }
-        
-        const { lat, lon } = nominatimData[0];
-        await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon), { city: cityData, country: countryData });
-        setIsLocationModalOpen(false);
-
+      const countryData = countries.find(c => c.name === countryName);
+      if (!countryData) throw new Error("Invalid country selected.");
+  
+      const cityData = countryData.cities.find(c => c.name === city);
+      if (!cityData) throw new Error("Invalid city selected.");
+      
+      const method = countryData.method;
+      const today = new Date();
+      const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+  
+      const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${cityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
+  
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch prayer times. Please check your internet connection.');
+      const data: AladhanResponse = await response.json();
+      if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
+      
+      setPrayerData(data.data);
+      
+      const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
+      const cityDisplayName = language === 'ar' ? cityData.arabicName : cityData.name;
+      
+      setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
+      setSelectedCountry(countryData.name);
+      setSelectedCity(cityData.name);
+      setAvailableCities(countryData.cities);
+      setAppState('ready');
+      setIsLocationModalOpen(false);
+  
     } catch (e: any) {
-        setError(e.message);
-        setAppState('geo-fallback');
-        toast({ variant: "destructive", title: t.notificationError, description: e.message });
+      setError(e.message);
+      setAppState('geo-fallback');
+      toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
-  }, [toast, fetchPrayerTimesFromCoords, t.notificationError]);
+  }, [toast, fetchPrayerTimesFromCoords, language, t.notificationError]);
 
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -473,7 +483,7 @@ export default function Home() {
 
   const prayerList = useMemo(() => {
     if (!prayerData) return [];
-    return getPrayerList(prayerData.timings, new Date(parseInt(prayerData.date.timestamp) * 1000), language);
+    return getPrayerList(prayerData.timings, new Date(parseInt(prayerData.date.timestamp, 10) * 1000), language);
   }, [prayerData, language]);
   
   useEffect(() => {
@@ -552,14 +562,14 @@ export default function Home() {
         return;
     }
 
+    if (notificationStatus === 'denied') {
+        toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
+        return;
+    }
+    
     if (notificationStatus === 'granted') {
         setNotificationsEnabled(true);
         toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
-        return;
-    }
-
-    if (notificationStatus === 'denied') {
-        toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
         return;
     }
 
@@ -622,7 +632,26 @@ export default function Home() {
   }
 
   const { date } = prayerData;
-  const gregorianDate = language === 'ar' ? `${date.gregorian.weekday.ar}, ${date.readable}` : `${date.gregorian.weekday.en}, ${date.readable}`;
+  
+  const gregorianDate = useMemo(() => {
+    const dateObj = new Date(parseInt(date.timestamp, 10) * 1000);
+    if (language === 'ar') {
+      return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(dateObj);
+    }
+    // Using Intl for English as well for consistency
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(dateObj);
+  }, [date.timestamp, language]);
+
   const hijriDate = language === 'ar' ? `${date.hijri.weekday.ar}, ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year} هـ` : `${date.hijri.weekday.en}, ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
 
   return (
