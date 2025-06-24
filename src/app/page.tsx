@@ -331,72 +331,40 @@ export default function Home() {
       document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
 
-  const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number, manualLocation?: { city: City; country: Country }) => {
+  const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
     setAppState('loading');
     setError(null);
   
     try {
-      let countryData: Country | undefined;
-      let matchedCityData: City | undefined;
-
-      if (manualLocation) {
-        countryData = manualLocation.country;
-        matchedCityData = manualLocation.city;
-      } else {
-        const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-        if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
-        
-        const geoData = await geoResponse.json();
-        const apiCity = geoData.city || geoData.locality;
-        const countryCode = geoData.countryCode;
-        countryData = countries.find(c => c.code === countryCode);
-
-        if (!countryData || !apiCity) {
-          setAppState('geo-fallback');
-          setError(t.manualLocationPrompt);
-          return;
-        }
-        
-        // Find the closest city from our list to the one from the geo API
-        matchedCityData = countryData.cities.find(c => c.name.toLowerCase() === apiCity.toLowerCase());
-
-        if (!matchedCityData) {
-          setAppState('geo-fallback');
-          const errorMessage = `${t.cityNotMatched}: "${apiCity}". ${t.manualLocationPrompt}`;
-          setError(errorMessage);
-          toast({ variant: "destructive", title: t.cityNotMatched, description: `Could not automatically match your city "${apiCity}". Please select it manually.` });
-          setSelectedCountry(countryData.name);
-          setAvailableCities(countryData.cities);
-          setSelectedCity('');
-          return;
-        }
-      }
-
-      if (!countryData || !matchedCityData) {
-        throw new Error('Could not determine location data.');
+      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+      if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
+      
+      const geoData = await geoResponse.json();
+      const apiCity = geoData.city || geoData.locality;
+      const countryCode = geoData.countryCode;
+      
+      const countryData = countries.find(c => c.code === countryCode);
+      
+      if (!countryData || !apiCity) {
+        setAppState('geo-fallback');
+        setError(t.manualLocationPrompt);
+        return;
       }
       
-      const method = countryData.method;
-      const today = new Date();
-      const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
-      
-      const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${matchedCityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
-  
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch prayer times. Please check your internet connection.');
-      const data: AladhanResponse = await response.json();
-      if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
-      
-      setPrayerData(data.data);
+      const matchedCityData = countryData.cities.find(c => c.name.toLowerCase() === apiCity.toLowerCase());
 
-      const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
-      const cityDisplayName = language === 'ar' ? matchedCityData.arabicName : matchedCityData.name;
+      if (!matchedCityData) {
+        setAppState('geo-fallback');
+        const errorMessage = `${t.cityNotMatched}: "${apiCity}". ${t.manualLocationPrompt}`;
+        setError(errorMessage);
+        toast({ variant: "destructive", title: t.cityNotMatched, description: `Could not automatically match your city "${apiCity}". Please select it manually.` });
+        setSelectedCountry(countryData.name);
+        setAvailableCities(countryData.cities);
+        setSelectedCity('');
+        return;
+      }
       
-      setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
-      setSelectedCountry(countryData.name);
-      setSelectedCity(matchedCityData.name);
-      setAvailableCities(countryData.cities);
-      setAppState('ready');
+      await fetchPrayerTimesByCity(matchedCityData.name, countryData.name);
   
     } catch (e: any) {
       setError(e.message);
@@ -486,6 +454,46 @@ export default function Home() {
     return getPrayerList(prayerData.timings, new Date(parseInt(prayerData.date.timestamp, 10) * 1000), language);
   }, [prayerData, language]);
   
+  const { nextPrayer, countdown } = useMemo(() => {
+    if (!prayerList.length) return { nextPrayer: null, countdown: '00:00:00' };
+    const next = findNextPrayer(prayerList, currentTime);
+    const diff = next ? next.date.getTime() - currentTime.getTime() : 0;
+    return {
+      nextPrayer: next as Prayer,
+      countdown: formatCountdown(diff),
+    };
+  }, [prayerList, currentTime]);
+  
+  const prayerTimesToDisplay = useMemo(() => {
+    return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
+  }, [prayerList]);
+
+  const gregorianDate = useMemo(() => {
+    if (!prayerData) return "";
+    const { date } = prayerData;
+    const dateObj = new Date(parseInt(date.timestamp, 10) * 1000);
+    if (language === 'ar') {
+      return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(dateObj);
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(dateObj);
+  }, [prayerData, language]);
+
+  const hijriDate = useMemo(() => {
+    if (!prayerData) return "";
+    const { date } = prayerData;
+    return language === 'ar' ? `${date.hijri.weekday.ar}, ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year} هـ` : `${date.hijri.weekday.en}, ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
+  }, [prayerData, language]);
+  
   useEffect(() => {
       const timeoutIds = (window as any).prayerNotificationTimeouts || [];
       timeoutIds.forEach(clearTimeout);
@@ -519,22 +527,8 @@ export default function Home() {
   }, [notificationsEnabled, prayerList, language, t]);
 
 
-  const { nextPrayer, countdown } = useMemo(() => {
-    if (!prayerList.length) return { nextPrayer: null, countdown: '00:00:00' };
-    const next = findNextPrayer(prayerList, currentTime);
-    const diff = next ? next.date.getTime() - currentTime.getTime() : 0;
-    return {
-      nextPrayer: next as Prayer,
-      countdown: formatCountdown(diff),
-    };
-  }, [prayerList, currentTime]);
-  
-  const prayerTimesToDisplay = useMemo(() => {
-    return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
-  }, [prayerList]);
-
   const handleCountryChange = useCallback((countryIdentifier: string) => {
-    const countryData = countries.find(c => c.name === countryIdentifier || c.arabicName === countryIdentifier);
+    const countryData = countries.find(c => c.name.toLowerCase() === countryIdentifier.toLowerCase() || c.arabicName === countryIdentifier);
     if (countryData) {
         setSelectedCountry(countryData.name);
         setAvailableCities(countryData.cities);
@@ -543,7 +537,7 @@ export default function Home() {
   }, []);
   
   const handleCityChange = useCallback((cityIdentifier: string) => {
-      const cityData = availableCities.find(c => c.name === cityIdentifier || c.arabicName === cityIdentifier);
+      const cityData = availableCities.find(c => c.name.toLowerCase() === cityIdentifier.toLowerCase() || c.arabicName === cityIdentifier);
       if (cityData) {
           setSelectedCity(cityData.name);
       }
@@ -628,32 +622,9 @@ export default function Home() {
   }
 
   if (!prayerData) {
-    return null; // Should not happen if states are managed correctly
+    return null;
   }
-
-  const { date } = prayerData;
   
-  const gregorianDate = useMemo(() => {
-    const dateObj = new Date(parseInt(date.timestamp, 10) * 1000);
-    if (language === 'ar') {
-      return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }).format(dateObj);
-    }
-    // Using Intl for English as well for consistency
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(dateObj);
-  }, [date.timestamp, language]);
-
-  const hijriDate = language === 'ar' ? `${date.hijri.weekday.ar}, ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year} هـ` : `${date.hijri.weekday.en}, ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="container mx-auto px-4 py-4 flex justify-between items-center">
