@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import type { City } from '@/lib/locations';
@@ -22,6 +22,7 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const { toast } = useToast();
+  const geoAttempted = useRef(false);
 
   const fetchPrayerTimesByCity = useCallback(async (cityIdentifier: string, countryIdentifier: string) => {
     setAppState('loading');
@@ -114,6 +115,11 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
   }, [toast, t, fetchPrayerTimesByCity, language]);
   
   useEffect(() => {
+    if (geoAttempted.current) {
+      return;
+    }
+    geoAttempted.current = true;
+
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
