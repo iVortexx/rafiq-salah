@@ -44,6 +44,15 @@ export const translations = {
     geolocationNotSupported: "تحديد الموقع غير مدعوم",
     geolocationNotSupportedDesc: "متصفحك لا يدعم هذه الميزة. يرجى تحديد موقعك يدويًا.",
     cityNotMatched: "لم نتمكن من مطابقة مدينتك",
+    methodNames: {
+      "Muslim World League": "رابطة العالم الإسلامي",
+      "Egyptian General Authority of Survey": "الهيئة المصرية العامة للمساحة",
+      "Umm Al-Qura University, Makkah": "جامعة أم القرى، مكة المكرمة",
+      "Institute of Geophysics, University of Tehran": "معهد الجيوفيزياء، جامعة طهران",
+      "Gulf Region": "دول الخليج (دبي)",
+      "Kuwait": "الكويت",
+      "Qatar": "قطر",
+    },
   },
   en: {
     title: "Prayer Pal",
@@ -89,5 +98,14 @@ export const translations = {
     geolocationNotSupported: "Geolocation Not Supported",
     geolocationNotSupportedDesc: "Your browser does not support this feature. Please select your location manually.",
     cityNotMatched: "Could not match your city",
+    methodNames: {
+      "Muslim World League": "Muslim World League",
+      "Egyptian General Authority of Survey": "Egyptian General Authority of Survey",
+      "Umm Al-Qura University, Makkah": "Umm Al-Qura University, Makkah",
+      "Institute of Geophysics, University of Tehran": "Institute of Geophysics, University of Tehran",
+      "Gulf Region": "Gulf Region",
+      "Kuwait": "Kuwait",
+      "Qatar": "Qatar",
+    },
   }
 };

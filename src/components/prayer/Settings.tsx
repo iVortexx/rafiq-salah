@@ -54,7 +54,7 @@ export const Settings = memo(({
         <CardContent>
           <p className="text-lg">
             <span className="font-semibold">{t.method}: </span> 
-            {prayerData.meta.method.name}
+            {t.methodNames[prayerData.meta.method.name] || prayerData.meta.method.name}
           </p>
         </CardContent>
       </Card>

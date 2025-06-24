@@ -42,13 +42,13 @@ const LanguageSwitcher = memo(({ language, setLanguage }: LanguageSwitcherProps)
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setLanguage('en')} className="gap-2 cursor-pointer">
-                    <USFlag />
-                    <span>English</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setLanguage('ar')} className="gap-2 cursor-pointer">
                     <EgyptFlag />
                     <span>العربية</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('en')} className="gap-2 cursor-pointer">
+                    <USFlag />
+                    <span>English</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
