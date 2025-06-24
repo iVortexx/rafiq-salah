@@ -63,7 +63,7 @@ const CommandList = React.forwardRef<
   <CommandPrimitive.List
     ref={ref}
     className={cn(
-      "h-48 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-rounded-md scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600",
+      "max-h-[300px] overflow-y-auto overflow-x-hidden",
       className
     )}
     {...props}
@@ -156,3 +156,5 @@ export {
   CommandShortcut,
   CommandSeparator,
 }
+
+    

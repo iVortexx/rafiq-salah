@@ -5,11 +5,10 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import type { AladhanResponse, PrayerData } from '@/types/prayer';
+import type { AladhanResponse, PrayerData, Country } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
-import { countries, type Country, type City } from '@/lib/locations';
+import { countries, type City } from '@/lib/locations';
 import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon } from 'lucide-react';
 import {
   Dialog,
@@ -21,7 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 
 const prayerIcons: { [key: string]: React.ReactNode } = {
   Fajr: <Sunrise className="w-8 h-8 text-accent" />,
@@ -68,7 +67,7 @@ const LocationForm = memo(({
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" position="popper">
             <Command>
               <CommandInput placeholder="ابحث عن دولة..." />
               <CommandList>
@@ -102,10 +101,10 @@ const LocationForm = memo(({
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" position="popper">
              <Command>
               <CommandInput placeholder="ابحث عن مدينة..." />
-              <CommandList>
+               <CommandList>
                 <CommandEmpty>لم يتم العثور على مدينة.</CommandEmpty>
                 <CommandGroup>
                   {availableCities.map((city) => (
@@ -179,85 +178,87 @@ export default function Home() {
   const { toast } = useToast();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
-  const fetchPrayerTimes = useCallback(async (city: string, countryName: string) => {
-    setLoading(true);
+  const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
+    if (!geoLoading) setGeoLoading(true);
+    if (loading) setLoading(true);
     setError(null);
-    setGeoLoading(true);
-
-    const countryData = countries.find(c => c.name === countryName);
-    if (!countryData) {
-        const msg = 'الدولة المختارة غير مدعومة في هذا التطبيق.';
-        setError(msg);
-        toast({ variant: "destructive", title: "الموقع غير مدعوم", description: msg });
-        setLoading(false);
-        setGeoLoading(false);
-        return;
-    }
-
-    const method = countryData.method;
-    const today = new Date();
-    const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
-    
-    const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(countryName)}&method=${method}`;
-
+  
     try {
+      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
+      if (!geoResponse.ok) throw new Error('فشلت خدمة تحديد الموقع الجغرافي العكسي.');
+      
+      const geoData = await geoResponse.json();
+      const city = geoData.city || geoData.locality;
+      const countryCode = geoData.countryCode;
+      const countryData = countries.find(c => c.code === countryCode);
+
+      if (!countryData || !city) {
+        const errorMsg = countryData ? "تعذر تحديد المدينة من إحداثياتك." : "بلدك الذي تم اكتشافه غير مدعوم من قبل هذا التطبيق.";
+        throw new Error(errorMsg);
+      }
+      
+      const method = countryData.method;
+      const today = new Date();
+      const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+      
+      const url = `https://api.aladhan.com/v1/timings/${dateString}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+  
       const response = await fetch(url);
-      if (!response.ok) throw new Error('فشل جلب أوقات الصلاة. يرجى التحقق من اسم المدينة والدولة.');
+      if (!response.ok) throw new Error('فشل جلب أوقات الصلاة. يرجى التحقق من اتصالك بالإنترنت.');
       const data: AladhanResponse = await response.json();
       if (data.code !== 200) throw new Error(data.status || 'حدث خطأ غير معروف.');
       
-      const cityData = countryData.cities.find(c => c.arabicName === city);
-      
       setPrayerData(data.data);
-      setDisplayLocation(`${cityData?.arabicName || city}, ${countryData.arabicName}`);
+      setDisplayLocation(`${city}, ${countryData.arabicName}`);
       setSelectedCountry(countryData.name);
       setSelectedCity(city);
       setAvailableCities(countryData.cities);
-
+  
     } catch (e: any) {
       setError(e.message);
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: e.message,
-      });
+      toast({ variant: "destructive", title: "خطأ", description: e.message });
     } finally {
       setLoading(false);
       setGeoLoading(false);
       setIsLocationModalOpen(false);
     }
-  }, [toast]);
+  }, [toast, geoLoading, loading]);
+
+  const fetchPrayerTimesByCity = useCallback(async (city: string, countryCode: string) => {
+    setLoading(true);
+    setError(null);
+    setGeoLoading(true);
+
+    try {
+        const countryData = countries.find(c => c.code === countryCode);
+        if (!countryData) throw new Error("الدولة المحددة غير صالحة.");
+
+        const geoQuery = `${encodeURIComponent(city)},${encodeURIComponent(countryData.arabicName)}`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${geoQuery}&format=json&limit=1`;
+        
+        const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'SalatApp/1.0' } });
+        if (!nominatimRes.ok) throw new Error('فشل خدمة تحويل الموقع إلى إحداثيات.');
+        
+        const nominatimData = await nominatimRes.json();
+        if (nominatimData.length === 0) throw new Error(`لم نتمكن من العثور على إحداثيات لـ ${city}.`);
+        
+        const { lat, lon } = nominatimData[0];
+        await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon));
+
+    } catch (e: any) {
+        setError(e.message);
+        toast({ variant: "destructive", title: "خطأ", description: e.message, });
+        setLoading(false);
+        setGeoLoading(false);
+        setIsLocationModalOpen(false);
+    }
+  }, [toast, fetchPrayerTimesFromCoords]);
+  
 
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
-          if (!geoResponse.ok) {
-            throw new Error('فشلت خدمة تحديد الموقع الجغرافي العكسي.');
-          }
-          const geoData = await geoResponse.json();
-          
-          const countryCode = geoData.countryCode;
-          const city = geoData.city || geoData.locality;
-
-          const detectedCountry = countries.find(c => c.code === countryCode);
-
-          if (detectedCountry && city) {
-             await fetchPrayerTimes(city, detectedCountry.name);
-          } else {
-             const errorMsg = detectedCountry 
-                ? "تعذر تحديد المدينة من إحداثياتك." 
-                : "بلدك الذي تم اكتشافه غير مدعوم من قبل هذا التطبيق.";
-             setError(errorMsg);
-             setGeoLoading(false);
-          }
-        } catch (error: any) {
-          console.error("Geolocation or fetch process failed:", error);
-          toast({ title: "لم نتمكن من تحديد موقعك تلقائيًا", description: error.message || "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
-          setGeoLoading(false);
-        }
+        await fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude);
       }, (error) => {
         console.error("Geolocation permission failed:", error.message);
         toast({ title: "تم رفض الوصول إلى الموقع", description: "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
@@ -267,7 +268,7 @@ export default function Home() {
       toast({ title: "تحديد الموقع الجغرافي غير مدعوم", description: "يرجى تحديد موقعك يدويًا." });
       setGeoLoading(false);
     }
-  }, [fetchPrayerTimes, toast]);
+  }, [fetchPrayerTimesFromCoords, toast]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -306,10 +307,11 @@ export default function Home() {
 
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedCity && selectedCountry) {
-      fetchPrayerTimes(selectedCity, selectedCountry);
+    const countryData = countries.find(c => c.name === selectedCountry);
+    if (selectedCity && countryData) {
+      fetchPrayerTimesByCity(selectedCity, countryData.code);
     }
-  }, [selectedCity, selectedCountry, fetchPrayerTimes]);
+  }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (enabled: boolean) => {
     if (enabled) {
@@ -468,10 +470,10 @@ export default function Home() {
                 <CardDescription>تلقي إشعارات لأوقات الصلاة.</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 space-x-reverse">
+              <Label htmlFor="notifications" className="flex items-center gap-3 cursor-pointer">
                  <Bell className="w-6 h-6 text-accent"/>
-                 <Label htmlFor="notifications" className="text-lg font-semibold">تفعيل الإشعارات</Label>
-              </div>
+                 <span className="text-lg font-semibold">تفعيل الإشعارات</span>
+              </Label>
               <Switch id="notifications" checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} aria-label="تفعيل أو تعطيل إشعارات الصلاة" />
             </CardContent>
           </Card>
@@ -482,7 +484,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p className="text-lg">
-                <span className="font-semibold">الطريقة: </span>
+                <span className="font-semibold">الطريقة: </span> 
                 {prayerData.meta.method.name}
               </p>
             </CardContent>
@@ -498,3 +500,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
