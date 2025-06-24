@@ -12,7 +12,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(error);
+      // Invalid data in localStorage, gracefully fallback to initialValue
       return initialValue;
     }
   });
@@ -32,12 +32,17 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === key && e.newValue) {
-        setStoredValue(JSON.parse(e.newValue));
+        try {
+          setStoredValue(JSON.parse(e.newValue));
+        } catch (error) {
+          // Gracefully handle parse error from other tabs/windows
+          setStoredValue(initialValue);
+        }
       }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [key]);
+  }, [key, initialValue]);
 
   return [storedValue, setValue];
 }
