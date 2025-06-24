@@ -159,10 +159,11 @@ export default function Home() {
 
     const countryData = countries.find(c => c.name === countryName);
     if (!countryData) {
-        const msg = 'Country data not found.';
+        const msg = 'Your detected country is not supported by this app.';
         setError(msg);
-        toast({ variant: "destructive", title: "Error", description: msg });
+        toast({ variant: "destructive", title: "Location Not Supported", description: msg });
         setLoading(false);
+        setGeoLoading(false); // Fix: Ensure geoLoading is set to false
         return;
     }
 
@@ -201,34 +202,32 @@ export default function Home() {
   }, [toast]);
 
   useEffect(() => {
+    // This effect runs only once on mount to get the initial location.
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Request city name in Arabic
           const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
+          if (!geoResponse.ok) {
+            throw new Error('Reverse geocoding service failed.');
+          }
           const geoData = await geoResponse.json();
           
-          const countryName = geoData.countryName; // English country name
-          const city = geoData.city; // Arabic city name
+          const countryName = geoData.countryName;
+          const city = geoData.city || geoData.locality; // Use city, fallback to locality for better results
 
-          const countryData = countries.find(c => c.name === countryName);
-
-          if (countryData && city) {
-            // Match Arabic city name from geocoding with our list
-            const matchedCity = countryData.cities.find(c => c.name === city);
-            await fetchPrayerTimes(matchedCity ? matchedCity.name : city, countryName);
+          if (countryName && city) {
+             await fetchPrayerTimes(city, countryName);
           } else {
-            toast({ title: "Could not determine location", description: "Please select your location manually."});
-            setGeoLoading(false);
+            throw new Error("Could not determine city and country from your coordinates.");
           }
-        } catch (error) {
-          console.error("Reverse geocoding failed", error);
+        } catch (error: any) {
+          console.error("Geolocation or fetch process failed:", error);
           toast({ title: "Could not determine location", description: "Please select your location manually.", variant: "destructive" });
           setGeoLoading(false);
         }
       }, (error) => {
-        console.error("Geolocation failed:", error.message);
+        console.error("Geolocation permission failed:", error.message);
         toast({ title: "Location Access Denied", description: "Please manually select your location.", variant: "destructive" });
         setGeoLoading(false);
       });
@@ -236,7 +235,8 @@ export default function Home() {
       toast({ title: "Geolocation Not Supported", description: "Please manually select your location." });
       setGeoLoading(false);
     }
-  }, [fetchPrayerTimes, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty to run only once
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
