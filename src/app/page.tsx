@@ -161,13 +161,13 @@ const LocationForm = memo(({
                   {countries.map((country) => (
                     <CommandItem
                       key={country.name}
-                      value={country.name}
+                      value={language === 'ar' ? country.arabicName : country.name}
                       onSelect={(currentValue) => {
-                         handleCountryChange(countries.find(c => c.name.toLowerCase() === currentValue.toLowerCase())?.name || '');
+                         handleCountryChange(currentValue);
                          setCountryOpen(false);
                       }}
                     >
-                      <Check className={cn("me-2 h-4 w-4", selectedCountry.toLowerCase() === country.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                      <Check className={cn("me-2 h-4 w-4", selectedCountry === country.name ? "opacity-100" : "opacity-0")} />
                       {language === 'ar' ? country.arabicName : country.name}
                     </CommandItem>
                   ))}
@@ -197,7 +197,7 @@ const LocationForm = memo(({
                       key={city.name}
                       value={city.name}
                       onSelect={(currentValue) => {
-                        handleCityChange(availableCities.find(c => c.name.toLowerCase() === currentValue.toLowerCase())?.name || '');
+                        handleCityChange(currentValue);
                         setCityOpen(false);
                       }}
                     >
@@ -482,8 +482,8 @@ export default function Home() {
     return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
-  const handleCountryChange = useCallback((countryName: string) => {
-    const countryData = countries.find(c => c.name === countryName);
+  const handleCountryChange = useCallback((countryIdentifier: string) => {
+    const countryData = countries.find(c => c.name.toLowerCase() === countryIdentifier.toLowerCase() || c.arabicName === countryIdentifier);
     if (countryData) {
         setSelectedCountry(countryData.name);
         setAvailableCities(countryData.cities);
@@ -503,20 +503,24 @@ export default function Home() {
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (checked: boolean) => {
+    setNotificationsEnabled(checked);
     if (!checked) return;
 
     if (!('Notification' in window)) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
-        return;
-    }
-
-    if (notificationStatus === 'denied') {
-        toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
+        setNotificationsEnabled(false);
         return;
     }
 
     if (notificationStatus === 'granted') {
         toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
+        setNotificationsEnabled(true);
+        return;
+    }
+
+    if (notificationStatus === 'denied') {
+        toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
+        setNotificationsEnabled(false);
         return;
     }
 
