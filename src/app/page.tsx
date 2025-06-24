@@ -208,8 +208,7 @@ export default function Home() {
                         key={country.name}
                         value={country.name}
                         onSelect={(currentValue) => {
-                           const countryName = countries.find(c => c.name.toLowerCase() === currentValue)?.name || '';
-                           handleCountryChange(countryName);
+                           handleCountryChange(currentValue);
                            setCountryOpen(false);
                         }}
                       >
@@ -243,7 +242,7 @@ export default function Home() {
                         key={city}
                         value={city}
                         onSelect={(currentValue) => {
-                          setSelectedCity(currentValue === selectedCity ? "" : currentValue);
+                          setSelectedCity(currentValue);
                           setCityOpen(false);
                         }}
                       >
