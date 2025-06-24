@@ -9,7 +9,16 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
-import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2 } from 'lucide-react';
+import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const prayerIcons: { [key: string]: React.ReactNode } = {
   Fajr: <Sunrise className="w-8 h-8 text-accent" />,
@@ -29,6 +38,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { toast } = useToast();
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const fetchPrayerTimes = useCallback(async (source: { lat: number; lon: number } | { city: string }) => {
     setLoading(true);
@@ -105,6 +115,7 @@ export default function Home() {
     e.preventDefault();
     if (manualCity.trim()) {
       fetchPrayerTimes({ city: manualCity.trim() });
+      setIsLocationModalOpen(false);
     }
   };
 
@@ -189,6 +200,43 @@ export default function Home() {
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">Prayer Pal</h1>
           <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.gregorian.readable}</p>
           <p className="text-md text-accent font-semibold">{date.hijri.weekday.en}, {date.hijri.day} {date.hijri.month.en} {date.hijri.year} AH</p>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <MapPin className="w-5 h-5 text-muted-foreground" />
+            <span className="text-lg text-foreground">{prayerData.meta.timezone.replace(/_/g, " ")}</span>
+            <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Pencil className="w-4 h-4" />
+                  <span className="sr-only">Change location</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Change Location</DialogTitle>
+                  <DialogDescription>
+                    Enter a city name to get prayer times for a different location.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleManualCitySubmit} className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city-modal">City Name</Label>
+                    <Input
+                      id="city-modal"
+                      placeholder="e.g., London"
+                      value={manualCity}
+                      onChange={(e) => setManualCity(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
+                      Get Prayer Times
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
 
         {nextPrayer && (
@@ -242,7 +290,6 @@ export default function Home() {
       <footer className="text-center py-4 border-t mt-8">
         <p className="text-sm text-muted-foreground">
             Prayer times provided by <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>.
-            Location: {prayerData.meta.timezone}
         </p>
       </footer>
     </div>

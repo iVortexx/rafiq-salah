@@ -8,13 +8,21 @@ export interface Prayer {
 
 export const PRAYER_NAMES: (keyof PrayerTimings)[] = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
+function formatTo12Hour(timeString: string): string {
+  if (!timeString) return '';
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12; // Convert 0 to 12
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
 export function getPrayerList(timings: PrayerTimings, date: Date): Prayer[] {
   return PRAYER_NAMES.map(name => {
-    const timeString = timings[name];
-    const [hours, minutes] = timeString.split(':').map(Number);
+    const timeString24 = timings[name];
+    const [hours, minutes] = timeString24.split(':').map(Number);
     const prayerDate = new Date(date);
     prayerDate.setHours(hours, minutes, 0, 0);
-    return { name, time: timeString, date: prayerDate };
+    return { name, time: formatTo12Hour(timeString24), date: prayerDate };
   });
 }
 
