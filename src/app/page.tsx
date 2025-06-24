@@ -1,14 +1,15 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
+import { countries } from '@/lib/locations';
 import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil } from 'lucide-react';
 import {
   Dialog,
@@ -19,6 +20,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const prayerIcons: { [key: string]: React.ReactNode } = {
   Fajr: <Sunrise className="w-8 h-8 text-accent" />,
@@ -34,8 +42,11 @@ export default function Home() {
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [manualCity, setManualCity] = useState('');
-  const [manualCountry, setManualCountry] = useState('');
+  
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+
   const [displayLocation, setDisplayLocation] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -120,13 +131,21 @@ export default function Home() {
     return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
+  const handleCountryChange = (countryName: string) => {
+    setSelectedCountry(countryName);
+    const countryData = countries.find(c => c.name === countryName);
+    setAvailableCities(countryData ? countryData.cities : []);
+    setSelectedCity('');
+  };
+
   const handleManualLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (manualCity.trim() && manualCountry.trim()) {
-      fetchPrayerTimes({ city: manualCity.trim(), country: manualCountry.trim() });
-      setManualCity('');
-      setManualCountry('');
-      setIsLocationModalOpen(false);
+    if (selectedCity && selectedCountry) {
+      fetchPrayerTimes({ city: selectedCity, country: selectedCountry });
+      setSelectedCountry('');
+      setSelectedCity('');
+      setAvailableCities([]);
+      if(isLocationModalOpen) setIsLocationModalOpen(false);
     }
   };
 
@@ -154,6 +173,41 @@ export default function Home() {
       setNotificationsEnabled(false);
     }
   };
+  
+  const LocationForm = ({ inModal = false }: { inModal?: boolean }) => (
+     <form onSubmit={handleManualLocationSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor={`country-${inModal ? 'modal' : 'form'}`}>Country</Label>
+          <Select onValueChange={handleCountryChange} value={selectedCountry}>
+            <SelectTrigger id={`country-${inModal ? 'modal' : 'form'}`}>
+              <SelectValue placeholder="Select a country" />
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map((country) => (
+                <SelectItem key={country.name} value={country.name}>{country.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`city-${inModal ? 'modal' : 'form'}`}>City</Label>
+          <Select onValueChange={setSelectedCity} value={selectedCity} disabled={!selectedCountry}>
+            <SelectTrigger id={`city-${inModal ? 'modal' : 'form'}`}>
+              <SelectValue placeholder="Select a city" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableCities.map((city) => (
+                <SelectItem key={city} value={city}>{city}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" className="w-full" disabled={loading || !selectedCity || !selectedCountry}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
+          Get Prayer Times
+        </Button>
+      </form>
+  );
 
   if (loading && !prayerData) {
     return (
@@ -173,30 +227,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-center text-muted-foreground mb-4">{error}</p>
-            <form onSubmit={handleManualLocationSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="city">Enter City Name</Label>
-                <Input
-                  id="city"
-                  placeholder="e.g., Cairo"
-                  value={manualCity}
-                  onChange={(e) => setManualCity(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">Enter Country Name</Label>
-                <Input
-                  id="country"
-                  placeholder="e.g., Egypt"
-                  value={manualCountry}
-                  onChange={(e) => setManualCountry(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading || !manualCity.trim() || !manualCountry.trim()}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
-                Get Prayer Times
-              </Button>
-            </form>
+            <LocationForm />
           </CardContent>
         </Card>
       </div>
@@ -234,35 +265,12 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Change Location</DialogTitle>
                   <DialogDescription>
-                    Enter a city and country to get prayer times for a different location.
+                    Choose a country and city to get prayer times for a different location.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleManualLocationSubmit} className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city-modal">City Name</Label>
-                    <Input
-                      id="city-modal"
-                      placeholder="e.g., Cairo"
-                      value={manualCity}
-                      onChange={(e) => setManualCity(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="country-modal">Country Name</Label>
-                    <Input
-                      id="country-modal"
-                      placeholder="e.g., Egypt"
-                      value={manualCountry}
-                      onChange={(e) => setManualCountry(e.target.value)}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full" disabled={loading || !manualCity.trim() || !manualCountry.trim()}>
-                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
-                      Get Prayer Times
-                    </Button>
-                  </DialogFooter>
-                </form>
+                <div className="pt-4">
+                  <LocationForm inModal={true} />
+                </div>
               </DialogContent>
             </Dialog>
           </div>
