@@ -3,22 +3,20 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
-import { countries } from '@/lib/locations';
+import { countries, type Country } from '@/lib/locations';
 import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -38,10 +36,9 @@ const prayerIcons: { [key: string]: React.ReactNode } = {
 };
 
 export default function Home() {
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -53,15 +50,24 @@ export default function Home() {
   const { toast } = useToast();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
-  const fetchPrayerTimes = useCallback(async (source: { lat: number; lon: number } | { city: string; country: string }) => {
+  const fetchPrayerTimes = useCallback(async (city: string, countryName: string) => {
     setLoading(true);
     setError(null);
-    let url = '';
-    if ('city' in source) {
-      url = `https://api.aladhan.com/v1/timingsByCity?city=${source.city}&country=${source.country}&method=2`;
-    } else {
-      url = `https://api.aladhan.com/v1/timings?latitude=${source.lat}&longitude=${source.lon}&method=2`;
+
+    const countryData = countries.find(c => c.name === countryName);
+    if (!countryData) {
+        const msg = 'Country data not found.';
+        setError(msg);
+        toast({ variant: "destructive", title: "Error", description: msg });
+        setLoading(false);
+        return;
     }
+
+    const method = countryData.method;
+    const today = new Date();
+    const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+    
+    const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(countryName)}&method=${method}`;
 
     try {
       const response = await fetch(url);
@@ -69,13 +75,8 @@ export default function Home() {
       const data: AladhanResponse = await response.json();
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       setPrayerData(data.data);
-      if ('city' in source) {
-        setDisplayLocation(`${source.city}, ${source.country}`);
-      } else {
-        const timezone = data.data.meta.timezone;
-        const locationString = timezone.replace(/_/g, ' ').split('/').pop();
-        setDisplayLocation(locationString || timezone);
-      }
+      setDisplayLocation(`${city}, ${countryData.arabicName}`);
+
     } catch (e: any) {
       setError(e.message);
       toast({
@@ -85,27 +86,9 @@ export default function Home() {
       });
     } finally {
       setLoading(false);
+      setIsLocationModalOpen(false);
     }
   }, [toast]);
-
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation({ lat: latitude, lon: longitude });
-          fetchPrayerTimes({ lat: latitude, lon: longitude });
-        },
-        () => {
-          setError('Location permission denied. Please enter your location manually.');
-          setLoading(false);
-        }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser. Please enter your location manually.');
-      setLoading(false);
-    }
-  }, [fetchPrayerTimes]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -141,11 +124,7 @@ export default function Home() {
   const handleManualLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
-      fetchPrayerTimes({ city: selectedCity, country: selectedCountry });
-      setSelectedCountry('');
-      setSelectedCity('');
-      setAvailableCities([]);
-      if(isLocationModalOpen) setIsLocationModalOpen(false);
+      fetchPrayerTimes(selectedCity, selectedCountry);
     }
   };
 
@@ -183,8 +162,8 @@ export default function Home() {
               <SelectValue placeholder="Select a country" />
             </SelectTrigger>
             <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country.name} value={country.name}>{country.name}</SelectItem>
+              {countries.map((country: Country) => (
+                <SelectItem key={country.name} value={country.name}>{country.arabicName}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -209,27 +188,30 @@ export default function Home() {
       </form>
   );
 
-  if (loading && !prayerData) {
+  if (!prayerData && !loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <Loader2 className="w-16 h-16 animate-spin text-primary" />
-        <p className="mt-4 text-lg font-semibold font-headline">Fetching your location and prayer times...</p>
+        <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
+          <CardHeader>
+            <CardTitle className="font-headline text-center text-3xl text-primary">Welcome to Prayer Pal</CardTitle>
+            <CardDescription className="text-center text-muted-foreground pt-2">
+              Please select your location to see prayer times.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && <p className="text-center text-destructive mb-4">{error}</p>}
+            <LocationForm />
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (error && !prayerData) {
+  if (loading && !prayerData) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-center text-2xl">Location Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground mb-4">{error}</p>
-            <LocationForm />
-          </CardContent>
-        </Card>
+       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Loader2 className="w-16 h-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg font-semibold font-headline">Fetching prayer times...</p>
       </div>
     );
   }
@@ -250,7 +232,7 @@ export default function Home() {
         <header className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">Prayer Pal</h1>
           <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.gregorian.readable}</p>
-          <p className="text-md text-accent font-semibold">{date.hijri.weekday.en}, {date.hijri.day} {date.hijri.month.en} {date.hijri.year} AH</p>
+          <p className="text-md text-accent font-semibold">{date.hijri.weekday.ar}, {date.hijri.day} {date.hijri.month.ar} {date.hijri.year} هـ</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <MapPin className="w-5 h-5 text-muted-foreground" />
             <span className="text-lg text-foreground">{displayLocation}</span>
@@ -264,9 +246,6 @@ export default function Home() {
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Change Location</DialogTitle>
-                  <DialogDescription>
-                    Choose a country and city to get prayer times for a different location.
-                  </DialogDescription>
                 </DialogHeader>
                 <div className="pt-4">
                   <LocationForm inModal={true} />
