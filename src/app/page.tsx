@@ -35,27 +35,36 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [manualCity, setManualCity] = useState('');
+  const [manualCountry, setManualCountry] = useState('');
+  const [displayLocation, setDisplayLocation] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { toast } = useToast();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
-  const fetchPrayerTimes = useCallback(async (source: { lat: number; lon: number } | { city: string }) => {
+  const fetchPrayerTimes = useCallback(async (source: { lat: number; lon: number } | { city: string; country: string }) => {
     setLoading(true);
     setError(null);
     let url = '';
     if ('city' in source) {
-      url = `https://api.aladhan.com/v1/timingsByCity?city=${source.city}&country=&method=2`;
+      url = `https://api.aladhan.com/v1/timingsByCity?city=${source.city}&country=${source.country}&method=2`;
     } else {
       url = `https://api.aladhan.com/v1/timings?latitude=${source.lat}&longitude=${source.lon}&method=2`;
     }
 
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch prayer times. Please check the city name.');
+      if (!response.ok) throw new Error('Failed to fetch prayer times. Please check the city and country names.');
       const data: AladhanResponse = await response.json();
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       setPrayerData(data.data);
+      if ('city' in source) {
+        setDisplayLocation(`${source.city}, ${source.country}`);
+      } else {
+        const timezone = data.data.meta.timezone;
+        const locationString = timezone.replace(/_/g, ' ').split('/').pop();
+        setDisplayLocation(locationString || timezone);
+      }
     } catch (e: any) {
       setError(e.message);
       toast({
@@ -77,12 +86,12 @@ export default function Home() {
           fetchPrayerTimes({ lat: latitude, lon: longitude });
         },
         () => {
-          setError('Location permission denied. Please enter your city manually.');
+          setError('Location permission denied. Please enter your location manually.');
           setLoading(false);
         }
       );
     } else {
-      setError('Geolocation is not supported by your browser. Please enter your city manually.');
+      setError('Geolocation is not supported by your browser. Please enter your location manually.');
       setLoading(false);
     }
   }, [fetchPrayerTimes]);
@@ -111,10 +120,12 @@ export default function Home() {
     return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
-  const handleManualCitySubmit = (e: React.FormEvent) => {
+  const handleManualLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (manualCity.trim()) {
-      fetchPrayerTimes({ city: manualCity.trim() });
+    if (manualCity.trim() && manualCountry.trim()) {
+      fetchPrayerTimes({ city: manualCity.trim(), country: manualCountry.trim() });
+      setManualCity('');
+      setManualCountry('');
       setIsLocationModalOpen(false);
     }
   };
@@ -162,17 +173,26 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-center text-muted-foreground mb-4">{error}</p>
-            <form onSubmit={handleManualCitySubmit} className="space-y-4">
+            <form onSubmit={handleManualLocationSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="city">Enter City Name</Label>
                 <Input
                   id="city"
-                  placeholder="e.g., London"
+                  placeholder="e.g., Cairo"
                   value={manualCity}
                   onChange={(e) => setManualCity(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <div className="space-y-2">
+                <Label htmlFor="country">Enter Country Name</Label>
+                <Input
+                  id="country"
+                  placeholder="e.g., Egypt"
+                  value={manualCountry}
+                  onChange={(e) => setManualCountry(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading || !manualCity.trim() || !manualCountry.trim()}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
                 Get Prayer Times
               </Button>
@@ -202,7 +222,7 @@ export default function Home() {
           <p className="text-md text-accent font-semibold">{date.hijri.weekday.en}, {date.hijri.day} {date.hijri.month.en} {date.hijri.year} AH</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <MapPin className="w-5 h-5 text-muted-foreground" />
-            <span className="text-lg text-foreground">{prayerData.meta.timezone.replace(/_/g, " ")}</span>
+            <span className="text-lg text-foreground">{displayLocation}</span>
             <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -214,21 +234,30 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Change Location</DialogTitle>
                   <DialogDescription>
-                    Enter a city name to get prayer times for a different location.
+                    Enter a city and country to get prayer times for a different location.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleManualCitySubmit} className="space-y-4 pt-4">
+                <form onSubmit={handleManualLocationSubmit} className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="city-modal">City Name</Label>
                     <Input
                       id="city-modal"
-                      placeholder="e.g., London"
+                      placeholder="e.g., Cairo"
                       value={manualCity}
                       onChange={(e) => setManualCity(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country-modal">Country Name</Label>
+                    <Input
+                      id="country-modal"
+                      placeholder="e.g., Egypt"
+                      value={manualCountry}
+                      onChange={(e) => setManualCountry(e.target.value)}
+                    />
+                  </div>
                   <DialogFooter>
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    <Button type="submit" className="w-full" disabled={loading || !manualCity.trim() || !manualCountry.trim()}>
                       {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
                       Get Prayer Times
                     </Button>
