@@ -1,4 +1,4 @@
-import { type PrayerTimings } from "@/types/prayer";
+import { type PrayerTimings, type DateInfo } from "@/types/prayer";
 
 export interface Prayer {
   name: string;
@@ -31,12 +31,18 @@ function formatTo12Hour(timeString: string, lang: 'ar' | 'en'): string {
   return `${hours12}:${formattedMinutes} ${period}`;
 }
 
-export function getPrayerList(timings: PrayerTimings, date: Date, lang: 'ar' | 'en'): Prayer[] {
+export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 'ar' | 'en'): Prayer[] {
+  // Use the UTC timestamp for midnight at the location to ensure timezone correctness.
+  const midnightTimestamp = parseInt(dateInfo.timestamp, 10) * 1000;
+
   return PRAYER_NAMES.map(name => {
     const timeString24 = timings[name];
     const [hours, minutes] = timeString24.split(':').map(Number);
-    const prayerDate = new Date(date);
-    prayerDate.setHours(hours, minutes, 0, 0);
+    
+    // Calculate the prayer's exact UTC timestamp by adding its time to the midnight timestamp.
+    const prayerTimestamp = midnightTimestamp + (hours * 3600 * 1000) + (minutes * 60 * 1000);
+    const prayerDate = new Date(prayerTimestamp);
+
     return { 
       name, 
       displayName: lang === 'ar' ? ARABIC_PRAYER_NAME_MAP[name] : name,

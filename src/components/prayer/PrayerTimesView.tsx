@@ -67,8 +67,7 @@ export const PrayerTimesView = ({
 
   const prayerList = useMemo(() => {
     if (!prayerData) return [];
-    const date = new Date(parseInt(prayerData.date.timestamp, 10) * 1000);
-    return getPrayerList(prayerData.timings, date, language);
+    return getPrayerList(prayerData.timings, prayerData.date, language);
   }, [prayerData, language]);
 
   const { nextPrayer, countdown } = useMemo(() => {

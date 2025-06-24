@@ -73,8 +73,8 @@ export async function checkAndSendPrayerNotifications() {
         continue;
       }
 
-      // Find the next prayer
-      const prayerList = getPrayerList(prayerData.data.timings, now, language);
+      // Find the next prayer using the timezone-aware getPrayerList
+      const prayerList = getPrayerList(prayerData.data.timings, prayerData.data.date, language);
       const nextPrayer = findNextPrayer(prayerList, now);
 
       if (nextPrayer) {
