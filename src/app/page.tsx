@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import type { AladhanResponse, PrayerData, Country } from '@/types/prayer';
+import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
-import { countries, type City } from '@/lib/locations';
-import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon } from 'lucide-react';
+import { countries, type City, type Country } from '@/lib/locations';
+import { Sun, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,16 +21,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
-
-const prayerIcons: { [key: string]: React.ReactNode } = {
-  Fajr: <Sunrise className="w-8 h-8 text-accent" />,
-  Sunrise: <Sunrise className="w-8 h-8 text-accent" />,
-  Dhuhr: <Sun className="w-8 h-8 text-accent" />,
-  Asr: <Sun className="w-8 h-8 text-accent" />,
-  Maghrib: <Sunset className="w-8 h-8 text-accent" />,
-  Sunset: <Sunset className="w-8 h-8 text-accent" />,
-  Isha: <Moon className="w-8 h-8 text-accent" />,
-};
 
 interface LocationFormProps {
   selectedCountry: string;
@@ -161,7 +151,7 @@ const ThemeSwitcher = () => {
     );
 };
 
-type AppState = 'loading' | 'ready' | 'error';
+type AppState = 'loading' | 'ready' | 'error' | 'geo-fallback';
 
 export default function Home() {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -215,7 +205,7 @@ export default function Home() {
   
     } catch (e: any) {
       setError(e.message);
-      setAppState('error');
+      setAppState('geo-fallback');
       toast({ variant: "destructive", title: "خطأ", description: e.message });
     }
   }, [toast]);
@@ -230,7 +220,7 @@ export default function Home() {
 
         const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)},${encodeURIComponent(countryData.name)}`;
         
-        const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'SalatApp/1.0' } });
+        const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
         if (!nominatimRes.ok) throw new Error('فشل خدمة تحويل الموقع إلى إحداثيات.');
         
         const nominatimData = await nominatimRes.json();
@@ -242,7 +232,7 @@ export default function Home() {
 
     } catch (e: any) {
         setError(e.message);
-        setAppState('error');
+        setAppState('geo-fallback');
         toast({ variant: "destructive", title: "خطأ", description: e.message });
     }
   }, [toast, fetchPrayerTimesFromCoords]);
@@ -256,14 +246,23 @@ export default function Home() {
         (error) => {
           console.error("Geolocation permission failed:", error.message);
           toast({ title: "تم رفض الوصول إلى الموقع", description: "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
-          setAppState('error');
+          setAppState('geo-fallback');
         }
       );
     } else {
       toast({ title: "تحديد الموقع الجغرافي غير مدعوم", description: "يرجى تحديد موقعك يدويًا." });
-      setAppState('error');
+      setAppState('geo-fallback');
     }
   }, [fetchPrayerTimesFromCoords, toast]);
+  
+  useEffect(() => {
+    // Check on mount if we already have permission.
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    } else {
+      setNotificationsEnabled(false);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -290,10 +289,12 @@ export default function Home() {
   }, [prayerList]);
 
   const handleCountryChange = useCallback((countryName: string) => {
-    setSelectedCountry(countryName);
     const countryData = countries.find(c => c.name === countryName);
-    setAvailableCities(countryData ? countryData.cities : []);
-    setSelectedCity('');
+    if (countryData) {
+        setSelectedCountry(countryData.name);
+        setAvailableCities(countryData.cities);
+        setSelectedCity('');
+    }
   }, []);
   
   const handleCityChange = useCallback((cityName: string) => {
@@ -307,28 +308,38 @@ export default function Home() {
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
-  const handleNotificationToggle = async (enabled: boolean) => {
-    if (enabled) {
-      if (!('Notification' in window)) {
-        toast({ variant: "destructive", title: "غير مدعوم", description: "هذا المتصفح لا يدعم إشعارات سطح المكتب." });
-        return;
-      }
-      if (Notification.permission === 'granted') {
-        setNotificationsEnabled(true);
-        toast({ title: "نجاح", description: "الإشعارات مفعلة بالفعل." });
-      } else if (Notification.permission !== 'denied') {
+  const handleNotificationToggle = async (checked: boolean) => {
+    // If the user is trying to turn notifications ON
+    if (checked) {
+        if (!('Notification' in window)) {
+            toast({ variant: "destructive", title: "غير مدعوم", description: "هذا المتصفح لا يدعم إشعارات سطح المكتب." });
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            setNotificationsEnabled(true);
+            // Optionally, you can remove this toast if it's annoying
+            toast({ title: "نجاح", description: "الإشعارات مفعلة بالفعل." });
+            return;
+        }
+
+        if (Notification.permission === 'denied') {
+            toast({ variant: "destructive", title: "محظور", description: "الإشعارات محظورة. يرجى تفعيلها في إعدادات المتصفح." });
+            return;
+        }
+
+        // Ask for permission
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          setNotificationsEnabled(true);
-          toast({ title: "نجاح", description: "تم تفعيل الإشعارات!" });
+            setNotificationsEnabled(true);
+            toast({ title: "نجاح", description: "تم تفعيل الإشعارات!" });
         } else {
-          toast({ variant: "destructive", title: "معلومات", description: "تم رفض إذن الإشعارات." });
+            setNotificationsEnabled(false); // User denied permission
+            toast({ variant: "destructive", title: "معلومات", description: "تم رفض إذن الإشعارات." });
         }
-      } else {
-        toast({ variant: "destructive", title: "محظور", description: "الإشعارات محظورة. يرجى تفعيلها في إعدادات المتصفح." });
-      }
     } else {
-      setNotificationsEnabled(false);
+        // User is turning notifications OFF
+        setNotificationsEnabled(false);
     }
   };
   
@@ -341,7 +352,7 @@ export default function Home() {
     );
   }
 
-  if (appState === 'error' && !prayerData) {
+  if (appState === 'geo-fallback' && !prayerData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
@@ -368,7 +379,7 @@ export default function Home() {
   }
 
   if (!prayerData) {
-    return null; // Should be handled by the loading/error states above
+    return null; // Should not happen if states are managed correctly
   }
 
   const { date } = prayerData;
@@ -460,7 +471,12 @@ export default function Home() {
                         <Bell className="w-6 h-6 text-accent"/>
                         <span className="text-lg font-semibold">تفعيل الإشعارات</span>
                     </Label>
-                    <Switch id="notifications" checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} aria-label="تفعيل أو تعطيل إشعارات الصلاة" />
+                    <Switch 
+                      id="notifications" 
+                      checked={notificationsEnabled} 
+                      onCheckedChange={handleNotificationToggle}
+                      aria-label="تفعيل أو تعطيل إشعارات الصلاة" 
+                    />
                 </div>
             </CardContent>
           </Card>
