@@ -3,7 +3,7 @@
 
 import { firestore, messagingAdmin } from './firebase-admin';
 import type { AladhanResponse } from '@/types/prayer';
-import { getPrayerList, findNextPrayer } from './time';
+import { findNextPrayer, PRAYER_NAMES, ARABIC_PRAYER_NAME_MAP } from './time';
 import { translations } from './translations';
 import { countries } from './locations';
 
@@ -73,8 +73,26 @@ export async function checkAndSendPrayerNotifications() {
         continue;
       }
 
-      // Find the next prayer using the timezone-aware getPrayerList
-      const prayerList = getPrayerList(prayerData.data.timings, prayerData.data.date, language);
+      // **FIXED LOGIC**: Create timezone-correct prayer list using the API's UTC timestamp.
+      const { timings, date: dateInfo } = prayerData.data;
+      // The timestamp from the API is for midnight in the location's timezone.
+      const midnightInLocation = new Date(parseInt(dateInfo.timestamp, 10) * 1000);
+
+      const prayerList = PRAYER_NAMES.map(name => {
+          const timeString24 = timings[name as keyof typeof timings];
+          const [hours, minutes] = timeString24.split(':').map(Number);
+          
+          const prayerDate = new Date(midnightInLocation.getTime());
+          // This correctly sets the time on a date object that's already in the right timezone's midnight.
+          prayerDate.setHours(hours, minutes, 0, 0);
+
+          return {
+            name,
+            displayName: language === 'ar' ? ARABIC_PRAYER_NAME_MAP[name] : name,
+            date: prayerDate
+          };
+      });
+      
       const nextPrayer = findNextPrayer(prayerList, now);
 
       if (nextPrayer) {

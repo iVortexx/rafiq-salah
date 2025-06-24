@@ -7,9 +7,9 @@ export interface Prayer {
   date: Date;
 }
 
-const PRAYER_NAMES: (keyof PrayerTimings)[] = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Sunset', 'Maghrib', 'Isha'];
+export const PRAYER_NAMES: (keyof PrayerTimings)[] = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Sunset', 'Maghrib', 'Isha'];
 
-const ARABIC_PRAYER_NAME_MAP: { [key: string]: string } = {
+export const ARABIC_PRAYER_NAME_MAP: { [key: string]: string } = {
   Fajr: 'الفجر',
   Sunrise: 'الشروق',
   Dhuhr: 'الظهر',
@@ -36,11 +36,10 @@ export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 
     const timeString24 = timings[name];
     const [hours, minutes] = timeString24.split(':').map(Number);
     
-    // Create a new Date object representing today in the user's timezone.
+    // Create a new Date object representing today in the user's browser timezone.
     const prayerDate = new Date(); 
     // Set the time of this Date object to the prayer's time.
-    // This correctly grounds the prayer time in the user's current day context,
-    // avoiding timezone complexities from the API's timestamp.
+    // This correctly grounds the prayer time in the user's current day context for client-side display.
     prayerDate.setHours(Number(hours), Number(minutes), 0, 0); 
 
     return { 
@@ -52,7 +51,7 @@ export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 
   });
 }
 
-export function findNextPrayer(prayerList: Prayer[], currentTime: Date): Prayer | null {
+export function findNextPrayer(prayerList: { name: string, date: Date }[], currentTime: Date): { name: string, date: Date } | null {
   const nextPrayer = prayerList.find(prayer => prayer.date > currentTime);
   if (nextPrayer) {
     return nextPrayer;
