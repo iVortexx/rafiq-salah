@@ -205,14 +205,18 @@ export default function Home() {
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+          // Request city name in Arabic
+          const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
           const geoData = await geoResponse.json();
-          const { countryName, city } = geoData;
           
+          const countryName = geoData.countryName; // English country name
+          const city = geoData.city; // Arabic city name
+
           const countryData = countries.find(c => c.name === countryName);
 
           if (countryData && city) {
-            const matchedCity = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
+            // Match Arabic city name from geocoding with our list
+            const matchedCity = countryData.cities.find(c => c.name === city);
             await fetchPrayerTimes(matchedCity ? matchedCity.name : city, countryName);
           } else {
             toast({ title: "Could not determine location", description: "Please select your location manually."});
