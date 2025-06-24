@@ -23,9 +23,15 @@ const PRAYER_NAME_MAP: { [key: string]: string } = {
 function formatTo12Hour(timeString: string): string {
   if (!timeString) return '';
   const [hours, minutes] = timeString.split(':').map(Number);
+  // Manual RTL support for AM/PM
   const period = hours >= 12 ? 'م' : 'ص';
-  const hours12 = hours % 12 || 12; // Convert 0 to 12
-  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  let hours12 = hours % 12;
+  if (hours12 === 0) hours12 = 12; // Convert 0 to 12
+  
+  const formattedMinutes = minutes.toString().padStart(2, '0');
+
+  // Combine with Arabic period
+  return `${hours12}:${formattedMinutes}`;
 }
 
 export function getPrayerList(timings: PrayerTimings, date: Date): Prayer[] {

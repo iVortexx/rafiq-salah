@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
 import { countries, type Country, type City } from '@/lib/locations';
-import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown } from 'lucide-react';
+import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const prayerIcons: { [key: string]: React.ReactNode } = {
   Fajr: <Sunrise className="w-8 h-8 text-accent" />,
@@ -33,7 +34,6 @@ const prayerIcons: { [key: string]: React.ReactNode } = {
 };
 
 interface LocationFormProps {
-  inModal?: boolean;
   selectedCountry: string;
   selectedCity: string;
   availableCities: City[];
@@ -44,7 +44,6 @@ interface LocationFormProps {
 }
 
 const LocationForm = memo(({
-  inModal = false,
   selectedCountry,
   selectedCity,
   availableCities,
@@ -57,7 +56,6 @@ const LocationForm = memo(({
   const [cityOpen, setCityOpen] = useState(false);
 
   const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
-  const selectedCityData = useMemo(() => availableCities.find(c => c.name === selectedCity), [selectedCity, availableCities]);
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
@@ -100,7 +98,7 @@ const LocationForm = memo(({
         <Popover open={cityOpen} onOpenChange={setCityOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCityData ? selectedCityData.arabicName : "اختر مدينة"}
+              {selectedCity || "اختر مدينة"}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -138,6 +136,33 @@ const LocationForm = memo(({
 });
 LocationForm.displayName = 'LocationForm';
 
+
+const ThemeSwitcher = () => {
+    const [theme, setTheme] = useState('light');
+
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    }, []);
+
+    const toggleTheme = () => {
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    };
+
+    return (
+        <Button onClick={toggleTheme} variant="ghost" size="icon">
+            <SunIcon className="h-6 w-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <MoonIcon className="absolute h-6 w-6 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+        </Button>
+    );
+};
+
+
 export default function Home() {
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +182,7 @@ export default function Home() {
   const fetchPrayerTimes = useCallback(async (city: string, countryName: string) => {
     setLoading(true);
     setError(null);
+    setGeoLoading(true);
 
     const countryData = countries.find(c => c.name === countryName);
     if (!countryData) {
@@ -224,7 +250,8 @@ export default function Home() {
              const errorMsg = detectedCountry 
                 ? "تعذر تحديد المدينة من إحداثياتك." 
                 : "بلدك الذي تم اكتشافه غير مدعوم من قبل هذا التطبيق.";
-             throw new Error(errorMsg);
+             setError(errorMsg);
+             setGeoLoading(false);
           }
         } catch (error: any) {
           console.error("Geolocation or fetch process failed:", error);
@@ -240,7 +267,7 @@ export default function Home() {
       toast({ title: "تحديد الموقع الجغرافي غير مدعوم", description: "يرجى تحديد موقعك يدويًا." });
       setGeoLoading(false);
     }
-  }, [fetchPrayerTimes]);
+  }, [fetchPrayerTimes, toast]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -263,7 +290,7 @@ export default function Home() {
   }, [prayerList, currentTime]);
   
   const prayerTimesToDisplay = useMemo(() => {
-    return prayerList.filter(p => p.name !== 'Sunrise');
+    return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
   const handleCountryChange = useCallback((countryName: string) => {
@@ -325,11 +352,10 @@ export default function Home() {
           <CardHeader>
             <CardTitle className="font-headline text-center text-3xl text-primary">أهلاً بك في رفيق الصلاة</CardTitle>
             <CardDescription className="text-center text-muted-foreground pt-2">
-              الرجاء تحديد موقعك لعرض أوقات الصلاة.
+              {error ? error : "الرجاء تحديد موقعك لعرض أوقات الصلاة."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && <p className="text-center text-destructive mb-4">{error}</p>}
             <LocationForm 
               selectedCountry={selectedCountry}
               selectedCity={selectedCity}
@@ -355,22 +381,23 @@ export default function Home() {
   }
 
   if (!prayerData) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <p className="mt-4 text-lg font-semibold font-headline">تعذر تحميل أوقات الصلاة. يرجى تحديث الصفحة والمحاولة مرة أخرى.</p>
-      </div>
-    );
+    return null; // Should be handled by the loading/error states above
   }
 
   const { date } = prayerData;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
-      <main className="container mx-auto px-4 py-8">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">رفيق الصلاة</h1>
+      <header className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold font-headline text-primary">رفيق الصلاة</h1>
+        <ThemeSwitcher />
+      </header>
+
+      <main className="container mx-auto px-4 pb-8">
+        
+        <section className="text-center mb-8">
           <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.gregorian.readable}</p>
-          <p className="text-md text-accent font-semibold">{date.hijri.weekday.ar}, {date.hijri.day} {date.hijri.month.ar} {date.hijri.year} هـ</p>
+          <p className="text-xl text-accent font-semibold">{date.hijri.weekday.ar}, {date.hijri.day} {date.hijri.month.ar} {date.hijri.year} هـ</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <MapPin className="w-5 h-5 text-muted-foreground" />
             <span className="text-lg text-foreground">{displayLocation}</span>
@@ -387,7 +414,6 @@ export default function Home() {
                 </DialogHeader>
                 <div className="pt-4">
                   <LocationForm 
-                    inModal={true}
                     selectedCountry={selectedCountry}
                     selectedCity={selectedCity}
                     availableCities={availableCities}
@@ -400,64 +426,73 @@ export default function Home() {
               </DialogContent>
             </Dialog>
           </div>
-        </header>
+        </section>
 
         {nextPrayer && (
-          <section className="mb-12">
-            <Card className="w-full max-w-2xl mx-auto bg-card border-primary/50 shadow-2xl shadow-primary/20">
+          <section className="mb-10">
+            <Card className="w-full max-w-2xl mx-auto bg-card border-primary/20 shadow-2xl shadow-primary/10">
               <CardHeader className="text-center pb-2">
-                <p className="text-lg text-primary font-semibold font-headline">الصلاة التالية</p>
-                <CardTitle className="font-headline text-5xl text-primary">{nextPrayer.arabicName}</CardTitle>
+                <p className="text-lg text-primary font-semibold font-headline">الصلاة القادمة</p>
+                <CardTitle className="font-headline text-5xl text-foreground">{nextPrayer.arabicName}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
-                <p className="font-mono text-6xl md:text-7xl font-bold text-foreground tracking-tight">{countdown}</p>
-                <p className="text-2xl text-muted-foreground">حتى {nextPrayer.time}</p>
+                <p className="font-mono text-6xl md:text-7xl font-bold text-primary tracking-tight">{countdown}</p>
+                <p className="text-2xl text-muted-foreground">{nextPrayer.time}</p>
               </CardContent>
             </Card>
           </section>
         )}
 
-        <section className="mb-12">
-           <h2 className="text-3xl font-headline text-center mb-6">أوقات صلاة اليوم</h2>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <section className="mb-10">
+           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {prayerTimesToDisplay.map((prayer) => (
-                <Card key={prayer.name} className={`bg-card transition-all duration-300 shadow-md hover:shadow-lg ${prayer.name === nextPrayer?.name ? 'border-accent ring-2 ring-accent' : ''}`}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-lg font-medium font-headline">{prayer.arabicName}</CardTitle>
-                    {prayerIcons[prayer.name]}
+                <Card key={prayer.name} className={cn(
+                  'text-center transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-1',
+                  prayer.name === nextPrayer?.name ? 'bg-primary/10 border-accent ring-2 ring-accent' : 'bg-card'
+                  )}>
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-xl font-medium font-headline">{prayer.arabicName}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-4xl font-bold font-mono text-end">{prayer.time}</div>
+                    <div className="text-4xl font-bold font-mono">{prayer.time}</div>
                   </CardContent>
                 </Card>
               ))}
            </div>
         </section>
 
-        <section className="flex justify-center">
-          <Card className="w-full max-w-md shadow-md">
-            <CardContent className="p-6 flex items-center justify-between">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="shadow-md">
+            <CardHeader>
+                <CardTitle className="font-headline">إشعارات الصلاة</CardTitle>
+                <CardDescription>تلقي إشعارات لأوقات الصلاة.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
               <div className="flex items-center space-x-3 space-x-reverse">
                  <Bell className="w-6 h-6 text-accent"/>
-                 <div>
-                    <Label htmlFor="notifications" className="text-lg font-semibold font-headline">إشعارات الصلاة</Label>
-                    <p className="text-sm text-muted-foreground">تلقي إشعارات لأوقات الصلاة.</p>
-                 </div>
+                 <Label htmlFor="notifications" className="text-lg font-semibold">تفعيل الإشعارات</Label>
               </div>
               <Switch id="notifications" checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} aria-label="تفعيل أو تعطيل إشعارات الصلاة" />
+            </CardContent>
+          </Card>
+          <Card className="shadow-md">
+            <CardHeader>
+                <CardTitle className="font-headline">معلومات الحساب</CardTitle>
+                <CardDescription>طريقة حساب أوقات الصلاة المستخدمة.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg">
+                <span className="font-semibold">الطريقة: </span>
+                {prayerData.meta.method.name}
+              </p>
             </CardContent>
           </Card>
         </section>
 
       </main>
-      <footer className="text-center py-4 border-t mt-8">
-        {prayerData && (
-          <p className="text-sm text-muted-foreground mb-2">
-              طريقة الحساب: {prayerData.meta.method.name}
-          </p>
-        )}
+      <footer className="text-center py-6 border-t mt-8">
         <p className="text-sm text-muted-foreground">
-            أوقات الصلاة مقدمة من <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>.
+            أوقات الصلاة مقدمة من <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>
         </p>
       </footer>
     </div>
