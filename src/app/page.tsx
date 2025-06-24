@@ -48,8 +48,22 @@ export default function Home() {
     handleCityChange,
     handleManualLocationSubmit,
     language,
+    // translations prop is passed inside GeoFallbackState and PrayerTimesView directly
+  };
+  
+  const prayerTimesViewProps = {
+    prayerData: prayerData!, // Use non-null assertion as it's checked before render
+    displayLocation,
+    isLocationModalOpen,
+    setIsLocationModalOpen,
+    notificationsEnabled,
+    notificationStatus,
+    handleNotificationToggle,
+    language,
     translations: t,
-  }
+    ...locationFormProps,
+    appState: appState,
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -61,9 +75,9 @@ export default function Home() {
         setTheme={setTheme}
       />
       <main className="container mx-auto px-4 pb-8">
-        {appState === 'loading' && <LoadingState translations={t} />}
+        {appState === 'loading' && <LoadingState />}
         
-        {appState === 'geo-fallback' && !prayerData && (
+        {appState === 'geo-fallback' && (
            <GeoFallbackState
             error={error}
             translations={t} 
@@ -71,19 +85,8 @@ export default function Home() {
           />
         )}
 
-        {prayerData && (
-          <PrayerTimesView
-            prayerData={prayerData}
-            displayLocation={displayLocation}
-            isLocationModalOpen={isLocationModalOpen}
-            setIsLocationModalOpen={setIsLocationModalOpen}
-            locationFormProps={locationFormProps}
-            notificationsEnabled={notificationsEnabled}
-            notificationStatus={notificationStatus}
-            handleNotificationToggle={handleNotificationToggle}
-            language={language}
-            translations={t}
-          />
+        {appState === 'ready' && prayerData && (
+          <PrayerTimesView {...prayerTimesViewProps} />
         )}
       </main>
       <footer className="text-center py-6 border-t mt-8">
