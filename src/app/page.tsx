@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
 import { countries, type Country } from '@/lib/locations';
-import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil } from 'lucide-react';
+import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,13 +18,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 const prayerIcons: { [key: string]: React.ReactNode } = {
   Fajr: <Sunrise className="w-8 h-8 text-accent" />,
@@ -39,6 +35,7 @@ export default function Home() {
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(true);
   
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -89,6 +86,36 @@ export default function Home() {
       setIsLocationModalOpen(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+          const geoData = await geoResponse.json();
+          const { countryName, city } = geoData;
+
+          const countryData = countries.find(c => c.name === countryName);
+          if (countryData && city) {
+            await fetchPrayerTimes(city, countryName);
+          } else {
+            setGeoLoading(false);
+          }
+        } catch (error) {
+          console.error("Reverse geocoding failed", error);
+          setGeoLoading(false);
+        }
+      }, (error) => {
+        console.error("Geolocation failed:", error.message);
+        toast({ title: "Location Access Denied", description: "Please manually select your location.", variant: "destructive" });
+        setGeoLoading(false);
+      });
+    } else {
+      toast({ title: "Geolocation Not Supported", description: "Please manually select your location." });
+      setGeoLoading(false);
+    }
+  }, [fetchPrayerTimes, toast]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -153,40 +180,99 @@ export default function Home() {
     }
   };
   
-  const LocationForm = ({ inModal = false }: { inModal?: boolean }) => (
+  const LocationForm = ({ inModal = false }: { inModal?: boolean }) => {
+    const [countryOpen, setCountryOpen] = useState(false);
+    const [cityOpen, setCityOpen] = useState(false);
+
+    return (
      <form onSubmit={handleManualLocationSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={`country-${inModal ? 'modal' : 'form'}`}>Country</Label>
-          <Select onValueChange={handleCountryChange} value={selectedCountry}>
-            <SelectTrigger id={`country-${inModal ? 'modal' : 'form'}`}>
-              <SelectValue placeholder="Select a country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country: Country) => (
-                <SelectItem key={country.name} value={country.name}>{country.arabicName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Country</Label>
+          <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
+                {selectedCountry
+                  ? countries.find((country) => country.name === selectedCountry)?.arabicName
+                  : "Select a country"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+              <Command>
+                <CommandInput placeholder="Search country..." />
+                <CommandList>
+                  <CommandEmpty>No country found.</CommandEmpty>
+                  <CommandGroup>
+                    {countries.map((country) => (
+                      <CommandItem
+                        key={country.name}
+                        value={country.name}
+                        onSelect={(currentValue) => {
+                           const countryName = countries.find(c => c.name.toLowerCase() === currentValue)?.name || '';
+                           handleCountryChange(countryName);
+                           setCountryOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedCountry === country.name ? "opacity-100" : "opacity-0")} />
+                        {country.arabicName}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2">
-          <Label htmlFor={`city-${inModal ? 'modal' : 'form'}`}>City</Label>
-          <Select onValueChange={setSelectedCity} value={selectedCity} disabled={!selectedCountry}>
-            <SelectTrigger id={`city-${inModal ? 'modal' : 'form'}`}>
-              <SelectValue placeholder="Select a city" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableCities.map((city) => (
-                <SelectItem key={city} value={city}>{city}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>City</Label>
+          <Popover open={cityOpen} onOpenChange={setCityOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
+                {selectedCity || "Select a city"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+               <Command>
+                <CommandInput placeholder="Search city..." />
+                <CommandList>
+                  <CommandEmpty>No city found.</CommandEmpty>
+                  <CommandGroup>
+                    {availableCities.map((city) => (
+                      <CommandItem
+                        key={city}
+                        value={city}
+                        onSelect={(currentValue) => {
+                          setSelectedCity(currentValue === selectedCity ? "" : currentValue);
+                          setCityOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedCity === city ? "opacity-100" : "opacity-0")} />
+                        {city}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         <Button type="submit" className="w-full" disabled={loading || !selectedCity || !selectedCountry}>
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
           Get Prayer Times
         </Button>
       </form>
-  );
+    );
+  };
+  
+  if (geoLoading) {
+    return (
+       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Loader2 className="w-16 h-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg font-semibold font-headline">Detecting your location...</p>
+      </div>
+    );
+  }
 
   if (!prayerData && !loading) {
     return (
@@ -219,10 +305,11 @@ export default function Home() {
   if (!prayerData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <p className="mt-4 text-lg font-semibold font-headline">Something went wrong. Please refresh the page.</p>
+        <p className="mt-4 text-lg font-semibold font-headline">Could not load prayer times. Please refresh and try again.</p>
       </div>
     );
   }
+
 
   const { date } = prayerData;
 
