@@ -67,6 +67,7 @@ const translations = {
     locationAccessDeniedDesc: "يرجى تحديد موقعك يدويًا لعرض أوقات الصلاة.",
     geolocationNotSupported: "تحديد الموقع غير مدعوم",
     geolocationNotSupportedDesc: "متصفحك لا يدعم هذه الميزة. يرجى تحديد موقعك يدويًا.",
+    cityNotMatched: "لم نتمكن من مطابقة مدينتك",
   },
   en: {
     title: "Prayer Pal",
@@ -111,6 +112,7 @@ const translations = {
     locationAccessDeniedDesc: "Please select your location manually to continue.",
     geolocationNotSupported: "Geolocation Not Supported",
     geolocationNotSupportedDesc: "Your browser does not support this feature. Please select your location manually.",
+    cityNotMatched: "Could not match your city",
   }
 };
 
@@ -329,23 +331,48 @@ export default function Home() {
       document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
 
-  const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
+  const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number, manualLocation?: { city: City; country: Country }) => {
     setAppState('loading');
     setError(null);
   
     try {
-      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-      if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
-      
-      const geoData = await geoResponse.json();
-      const city = geoData.city || geoData.locality;
-      const countryCode = geoData.countryCode;
-      const countryData = countries.find(c => c.code === countryCode);
+      let countryData: Country | undefined;
+      let matchedCityData: City | undefined;
 
-      if (!countryData || !city) {
-        setAppState('geo-fallback');
-        setError("Your detected country is not supported or city could not be determined.");
-        return;
+      if (manualLocation) {
+        countryData = manualLocation.country;
+        matchedCityData = manualLocation.city;
+      } else {
+        const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+        if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
+        
+        const geoData = await geoResponse.json();
+        const apiCity = geoData.city || geoData.locality;
+        const countryCode = geoData.countryCode;
+        countryData = countries.find(c => c.code === countryCode);
+
+        if (!countryData || !apiCity) {
+          setAppState('geo-fallback');
+          setError(t.manualLocationPrompt);
+          return;
+        }
+        
+        matchedCityData = countryData.cities.find(c => c.name.toLowerCase() === apiCity.toLowerCase());
+
+        if (!matchedCityData) {
+          setAppState('geo-fallback');
+          const errorMessage = `${t.cityNotMatched}: "${apiCity}". ${t.manualLocationPrompt}`;
+          setError(errorMessage);
+          toast({ variant: "destructive", title: t.cityNotMatched, description: `Could not automatically match your city "${apiCity}". Please select it manually.` });
+          setSelectedCountry(countryData.name);
+          setAvailableCities(countryData.cities);
+          setSelectedCity('');
+          return;
+        }
+      }
+
+      if (!countryData || !matchedCityData) {
+        throw new Error('Could not determine location data.');
       }
       
       const method = countryData.method;
@@ -360,13 +387,13 @@ export default function Home() {
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       
       setPrayerData(data.data);
+
       const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
-      const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
-      const cityDisplayName = language === 'ar' ? cityData?.arabicName || city : cityData?.name || city;
+      const cityDisplayName = language === 'ar' ? matchedCityData.arabicName : matchedCityData.name;
       
       setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
       setSelectedCountry(countryData.name);
-      setSelectedCity(city);
+      setSelectedCity(matchedCityData.name);
       setAvailableCities(countryData.cities);
       setAppState('ready');
   
@@ -375,7 +402,7 @@ export default function Home() {
       setAppState('geo-fallback');
       toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
-  }, [toast, t.notificationError, language]);
+  }, [toast, t.notificationError, language, t.manualLocationPrompt, t.cityNotMatched]);
 
   const fetchPrayerTimesByCity = useCallback(async (city: string, countryName: string) => {
     setAppState('loading');
@@ -385,7 +412,7 @@ export default function Home() {
         const countryData = countries.find(c => c.name === countryName);
         if (!countryData) throw new Error("Invalid country selected.");
 
-        const cityData = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase() || c.arabicName === city);
+        const cityData = countryData.cities.find(c => c.name === city);
         if (!cityData) throw new Error("Invalid city selected.");
 
         const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityData.name)},${encodeURIComponent(countryData.name)}`;
@@ -399,7 +426,7 @@ export default function Home() {
         }
         
         const { lat, lon } = nominatimData[0];
-        await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon));
+        await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon), { city: cityData, country: countryData });
         setIsLocationModalOpen(false);
 
     } catch (e: any) {
@@ -505,8 +532,8 @@ export default function Home() {
     }
   }, []);
   
-  const handleCityChange = useCallback((cityName: string) => {
-      const cityData = availableCities.find(c => c.name === cityName || c.arabicName === cityName);
+  const handleCityChange = useCallback((cityIdentifier: string) => {
+      const cityData = availableCities.find(c => c.name === cityIdentifier || c.arabicName === cityIdentifier);
       if (cityData) {
           setSelectedCity(cityData.name);
       }
@@ -515,10 +542,7 @@ export default function Home() {
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
-      const countryData = countries.find(c => c.name === selectedCountry);
-      const cityData = countryData?.cities.find(c => c.name.toLowerCase() === selectedCity.toLowerCase());
-      const cityForApi = cityData ? cityData.arabicName : selectedCity;
-      fetchPrayerTimesByCity(cityForApi, selectedCountry);
+      fetchPrayerTimesByCity(selectedCity, selectedCountry);
     }
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
