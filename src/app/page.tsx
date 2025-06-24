@@ -96,11 +96,10 @@ export default function Home() {
       countdown: formatCountdown(diff),
     };
   }, [prayerList, currentTime]);
-
-  const otherPrayers = useMemo(() => {
-    if (!nextPrayer) return prayerList;
-    return prayerList.filter(p => p.name !== nextPrayer.name);
-  }, [prayerList, nextPrayer]);
+  
+  const prayerTimesToDisplay = useMemo(() => {
+    return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
+  }, [prayerList]);
 
   const handleManualCitySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,9 +208,9 @@ export default function Home() {
 
         <section className="mb-12">
            <h2 className="text-3xl font-headline text-center mb-6">Today's Prayer Times</h2>
-           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {otherPrayers.map((prayer) => (
-                <Card key={prayer.name} className="bg-card transition-all duration-300 shadow-md hover:shadow-lg">
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {prayerTimesToDisplay.map((prayer) => (
+                <Card key={prayer.name} className={`bg-card transition-all duration-300 shadow-md hover:shadow-lg ${prayer.name === nextPrayer?.name ? 'border-accent ring-2 ring-accent' : ''}`}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-lg font-medium font-headline">{prayer.name}</CardTitle>
                     {prayerIcons[prayer.name]}
