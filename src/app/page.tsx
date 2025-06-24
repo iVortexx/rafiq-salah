@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 
@@ -309,37 +309,42 @@ export default function Home() {
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (checked: boolean) => {
-    // If the user is trying to turn notifications ON
-    if (checked) {
-        if (!('Notification' in window)) {
-            toast({ variant: "destructive", title: "غير مدعوم", description: "هذا المتصفح لا يدعم إشعارات سطح المكتب." });
-            return;
-        }
+    if (!('Notification' in window)) {
+        toast({ variant: "destructive", title: "غير مدعوم", description: "هذا المتصفح لا يدعم إشعارات سطح المكتب." });
+        setNotificationsEnabled(false); 
+        return;
+    }
 
+    if (checked) {
         if (Notification.permission === 'granted') {
             setNotificationsEnabled(true);
-            // Optionally, you can remove this toast if it's annoying
-            toast({ title: "نجاح", description: "الإشعارات مفعلة بالفعل." });
+            toast({ title: "تم التفعيل", description: "إشعارات الصلاة مفعلة الآن." });
             return;
         }
 
         if (Notification.permission === 'denied') {
             toast({ variant: "destructive", title: "محظور", description: "الإشعارات محظورة. يرجى تفعيلها في إعدادات المتصفح." });
+            setNotificationsEnabled(false);
             return;
         }
-
-        // Ask for permission
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            setNotificationsEnabled(true);
-            toast({ title: "نجاح", description: "تم تفعيل الإشعارات!" });
-        } else {
-            setNotificationsEnabled(false); // User denied permission
-            toast({ variant: "destructive", title: "معلومات", description: "تم رفض إذن الإشعارات." });
+        
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                setNotificationsEnabled(true);
+                toast({ title: "نجاح!", description: "تم تفعيل الإشعارات بنجاح." });
+            } else {
+                setNotificationsEnabled(false);
+                toast({ variant: "destructive", title: "تم الرفض", description: "لم يتم منح إذن الإشعارات." });
+            }
+        } catch (error) {
+            console.error("Error requesting notification permission:", error);
+            setNotificationsEnabled(false);
+            toast({ variant: "destructive", title: "خطأ", description: "حدث خطأ أثناء طلب إذن الإشعارات." });
         }
     } else {
-        // User is turning notifications OFF
         setNotificationsEnabled(false);
+        toast({ title: "تم التعطيل", description: "تم إيقاف إشعارات الصلاة." });
     }
   };
   
