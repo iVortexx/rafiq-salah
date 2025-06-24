@@ -59,11 +59,9 @@ export function useNotifications(t: any, location: string, language: 'ar' | 'en'
 
 
   const handleNotificationToggle = async (checked: boolean) => {
+    // If the switch is being turned on, proceed. Otherwise, do nothing,
+    // as the switch will be disabled and this shouldn't be triggered.
     if (!checked) {
-        // Here you might want to call a backend endpoint to delete the token
-        // For simplicity, we'll just disable it on the client
-        setNotificationsEnabled(false);
-        toast({ title: t.notificationDisabled, description: t.notificationDisabledDesc });
         return;
     }
 
@@ -77,8 +75,6 @@ export function useNotifications(t: any, location: string, language: 'ar' | 'en'
       return;
     }
 
-    // Allow re-requesting/re-registering even if already granted,
-    // to update location or other details on the backend.
     if (notificationStatus === 'denied') {
         toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
         return;

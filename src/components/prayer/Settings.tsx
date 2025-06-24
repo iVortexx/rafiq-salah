@@ -40,7 +40,7 @@ export const Settings = memo(({
                   id="notifications" 
                   checked={notificationsEnabled} 
                   onCheckedChange={onNotificationToggle}
-                  disabled={notificationStatus === 'denied'}
+                  disabled={notificationStatus === 'denied' || notificationsEnabled}
                   aria-label="Enable prayer notifications" 
                 />
             </div>
