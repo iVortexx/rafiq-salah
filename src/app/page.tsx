@@ -1,15 +1,15 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
-import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
-import { countries, type Country } from '@/lib/locations';
+import { getPrayerList, findNextPrayer, formatCountdown } from '@/lib/time';
+import { countries, type Country, type City } from '@/lib/locations';
 import { Sunrise, Sun, Sunset, Moon, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown } from 'lucide-react';
 import {
   Dialog,
@@ -31,6 +31,112 @@ const prayerIcons: { [key: string]: React.ReactNode } = {
   Isha: <Moon className="w-8 h-8 text-accent" />,
 };
 
+interface LocationFormProps {
+  inModal?: boolean;
+  selectedCountry: string;
+  selectedCity: string;
+  availableCities: City[];
+  loading: boolean;
+  handleCountryChange: (countryName: string) => void;
+  handleCityChange: (cityName: string) => void;
+  handleManualLocationSubmit: (e: React.FormEvent) => void;
+}
+
+const LocationForm = memo(({
+  inModal = false,
+  selectedCountry,
+  selectedCity,
+  availableCities,
+  loading,
+  handleCountryChange,
+  handleCityChange,
+  handleManualLocationSubmit
+}: LocationFormProps) => {
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+
+  const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
+  const selectedCityData = useMemo(() => availableCities.find(c => c.name === selectedCity), [selectedCity, availableCities]);
+
+  return (
+   <form onSubmit={handleManualLocationSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Country</Label>
+        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
+              {selectedCountryData ? selectedCountryData.arabicName : "Select a country"}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <Command>
+              <CommandInput placeholder="Search country..." />
+              <CommandList>
+                <CommandEmpty>No country found.</CommandEmpty>
+                <CommandGroup>
+                  {countries.map((country) => (
+                    <CommandItem
+                      key={country.name}
+                      value={country.name}
+                      onSelect={(currentValue) => {
+                         handleCountryChange(countries.find(c => c.name.toLowerCase() === currentValue.toLowerCase())?.name || '');
+                         setCountryOpen(false);
+                      }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", selectedCountry.toLowerCase() === country.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                      {country.arabicName}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="space-y-2">
+        <Label>City</Label>
+        <Popover open={cityOpen} onOpenChange={setCityOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
+              {selectedCityData ? selectedCityData.arabicName : "Select a city"}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+             <Command>
+              <CommandInput placeholder="Search city..." />
+              <CommandList>
+                <CommandEmpty>No city found.</CommandEmpty>
+                <CommandGroup>
+                  {availableCities.map((city) => (
+                    <CommandItem
+                      key={city.name}
+                      value={city.name}
+                      onSelect={(currentValue) => {
+                        handleCityChange(availableCities.find(c => c.name.toLowerCase() === currentValue.toLowerCase())?.name || '');
+                        setCityOpen(false);
+                      }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", selectedCity.toLowerCase() === city.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                      {city.arabicName}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <Button type="submit" className="w-full" disabled={loading || !selectedCity || !selectedCountry}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
+        Get Prayer Times
+      </Button>
+    </form>
+  );
+});
+LocationForm.displayName = 'LocationForm';
+
 export default function Home() {
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +145,7 @@ export default function Home() {
   
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
-  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [availableCities, setAvailableCities] = useState<City[]>([]);
 
   const [displayLocation, setDisplayLocation] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -71,8 +177,11 @@ export default function Home() {
       if (!response.ok) throw new Error('Failed to fetch prayer times. Please check the city and country names.');
       const data: AladhanResponse = await response.json();
       if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
+      
+      const cityData = countryData.cities.find(c => c.name === city);
+      
       setPrayerData(data.data);
-      setDisplayLocation(`${city}, ${countryData.arabicName}`);
+      setDisplayLocation(`${cityData?.arabicName || city}, ${countryData.arabicName}`);
       setSelectedCountry(countryData.name);
       setSelectedCity(city);
       setAvailableCities(countryData.cities);
@@ -86,6 +195,7 @@ export default function Home() {
       });
     } finally {
       setLoading(false);
+      setGeoLoading(false); // Ensure geo loading stops after fetch
       setIsLocationModalOpen(false);
     }
   }, [toast]);
@@ -102,14 +212,15 @@ export default function Home() {
           const countryData = countries.find(c => c.name === countryName);
 
           if (countryData && city) {
-            await fetchPrayerTimes(city, countryName);
+            const matchedCity = countryData.cities.find(c => c.name.toLowerCase() === city.toLowerCase());
+            await fetchPrayerTimes(matchedCity ? matchedCity.name : city, countryName);
           } else {
             toast({ title: "Could not determine location", description: "Please select your location manually."});
+            setGeoLoading(false);
           }
         } catch (error) {
           console.error("Reverse geocoding failed", error);
           toast({ title: "Could not determine location", description: "Please select your location manually.", variant: "destructive" });
-        } finally {
           setGeoLoading(false);
         }
       }, (error) => {
@@ -147,25 +258,23 @@ export default function Home() {
     return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
-  const handleCountryChange = (countryName: string) => {
-    const countryValue = countries.find(c => c.name.toLowerCase() === countryName.toLowerCase())?.name || '';
-    setSelectedCountry(countryValue);
-    const countryData = countries.find(c => c.name === countryValue);
+  const handleCountryChange = useCallback((countryName: string) => {
+    setSelectedCountry(countryName);
+    const countryData = countries.find(c => c.name === countryName);
     setAvailableCities(countryData ? countryData.cities : []);
     setSelectedCity('');
-  };
+  }, []);
   
-  const handleCityChange = (cityName: string) => {
-      const cityValue = availableCities.find(c => c.toLowerCase() === cityName.toLowerCase()) || '';
-      setSelectedCity(cityValue);
-  };
+  const handleCityChange = useCallback((cityName: string) => {
+      setSelectedCity(cityName);
+  }, []);
 
-  const handleManualLocationSubmit = (e: React.FormEvent) => {
+  const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCity && selectedCountry) {
       fetchPrayerTimes(selectedCity, selectedCountry);
     }
-  };
+  }, [selectedCity, selectedCountry, fetchPrayerTimes]);
 
   const handleNotificationToggle = async (enabled: boolean) => {
     if (enabled) {
@@ -192,90 +301,6 @@ export default function Home() {
     }
   };
   
-  const LocationForm = ({ inModal = false }: { inModal?: boolean }) => {
-    const [countryOpen, setCountryOpen] = useState(false);
-    const [cityOpen, setCityOpen] = useState(false);
-
-    return (
-     <form onSubmit={handleManualLocationSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label>Country</Label>
-          <Popover open={countryOpen} onOpenChange={setCountryOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
-                {selectedCountry
-                  ? countries.find((country) => country.name === selectedCountry)?.arabicName
-                  : "Select a country"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-              <Command>
-                <CommandInput placeholder="Search country..." />
-                <CommandList>
-                  <CommandEmpty>No country found.</CommandEmpty>
-                  <CommandGroup>
-                    {countries.map((country) => (
-                      <CommandItem
-                        key={country.name}
-                        value={country.name}
-                        onSelect={(currentValue) => {
-                           handleCountryChange(currentValue);
-                           setCountryOpen(false);
-                        }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4", selectedCountry.toLowerCase() === country.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                        {country.arabicName}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="space-y-2">
-          <Label>City</Label>
-          <Popover open={cityOpen} onOpenChange={setCityOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-                {selectedCity || "Select a city"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-               <Command>
-                <CommandInput placeholder="Search city..." />
-                <CommandList>
-                  <CommandEmpty>No city found.</CommandEmpty>
-                  <CommandGroup>
-                    {availableCities.map((city) => (
-                      <CommandItem
-                        key={city}
-                        value={city}
-                        onSelect={(currentValue) => {
-                          handleCityChange(currentValue);
-                          setCityOpen(false);
-                        }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4", selectedCity.toLowerCase() === city.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                        {city}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <Button type="submit" className="w-full" disabled={loading || !selectedCity || !selectedCountry}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
-          Get Prayer Times
-        </Button>
-      </form>
-    );
-  };
-  
   if (geoLoading) {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
@@ -297,7 +322,15 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             {error && <p className="text-center text-destructive mb-4">{error}</p>}
-            <LocationForm />
+            <LocationForm 
+              selectedCountry={selectedCountry}
+              selectedCity={selectedCity}
+              availableCities={availableCities}
+              loading={loading}
+              handleCountryChange={handleCountryChange}
+              handleCityChange={handleCityChange}
+              handleManualLocationSubmit={handleManualLocationSubmit}
+            />
           </CardContent>
         </Card>
       </div>
@@ -320,7 +353,6 @@ export default function Home() {
       </div>
     );
   }
-
 
   const { date } = prayerData;
 
@@ -346,7 +378,16 @@ export default function Home() {
                   <DialogTitle>Change Location</DialogTitle>
                 </DialogHeader>
                 <div className="pt-4">
-                  <LocationForm inModal={true} />
+                  <LocationForm 
+                    inModal={true}
+                    selectedCountry={selectedCountry}
+                    selectedCity={selectedCity}
+                    availableCities={availableCities}
+                    loading={loading}
+                    handleCountryChange={handleCountryChange}
+                    handleCityChange={handleCityChange}
+                    handleManualLocationSubmit={handleManualLocationSubmit}
+                  />
                 </div>
               </DialogContent>
             </Dialog>
@@ -402,6 +443,11 @@ export default function Home() {
 
       </main>
       <footer className="text-center py-4 border-t mt-8">
+        {prayerData && (
+          <p className="text-sm text-muted-foreground mb-2">
+              Calculation Method: {prayerData.meta.method.name}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
             Prayer times provided by <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>.
         </p>
@@ -409,5 +455,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
