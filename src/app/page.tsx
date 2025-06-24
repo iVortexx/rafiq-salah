@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
 import { countries, type City, type Country } from '@/lib/locations';
-import { Sun, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon } from 'lucide-react';
+import { Sun, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon, Languages } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,92 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+
+const translations = {
+  ar: {
+    title: "رفيق الصلاة",
+    loadingLocation: "جاري تحديد موقعك...",
+    welcome: "أهلاً بك في رفيق الصلاة",
+    manualLocationPrompt: "الرجاء تحديد موقعك لعرض أوقات الصلاة.",
+    changeLocation: "تغيير الموقع",
+    nextPrayer: "الصلاة القادمة",
+    prayerNotifications: "إشعارات الصلاة",
+    notificationDesc: "تلقي إشعارات لأوقات الصلاة.",
+    enableNotifications: "تفعيل الإشعارات",
+    calculationInfo: "معلومات الحساب",
+    calculationMethodDesc: "طريقة حساب أوقات الصلاة المستخدمة.",
+    method: "الطريقة",
+    apiCredit: "أوقات الصلاة مقدمة من",
+    country: "الدولة",
+    city: "المدينة",
+    selectCountry: "اختر دولة",
+    selectCity: "اختر مدينة",
+    searchCountry: "ابحث عن دولة...",
+    searchCity: "ابحث عن مدينة...",
+    countryNotFound: "لم يتم العثور على الدولة.",
+    cityNotFound: "لم يتم العثور على مدينة.",
+    getPrayerTimes: "الحصول على أوقات الصلاة",
+    notificationEnabled: "تم التفعيل",
+    notificationEnabledDesc: "إشعارات الصلاة مفعلة الآن.",
+    notificationDisabled: "تم التعطيل",
+    notificationDisabledDesc: "تم إيقاف إشعارات الصلاة.",
+    notificationBlocked: "محظور",
+    notificationBlockedDesc: "الإشعارات محظورة. يرجى تفعيلها في إعدادات المتصفح.",
+    notificationRequestSuccess: "نجاح!",
+    notificationRequestSuccessDesc: "تم تفعيل الإشعارات بنجاح.",
+    notificationRequestFailed: "تم الرفض",
+    notificationRequestFailedDesc: "لم يتم منح إذن الإشعارات.",
+    notificationError: "خطأ",
+    notificationErrorDesc: "حدث خطأ أثناء طلب إذن الإشعارات.",
+    notificationNotSupported: "غير مدعوم",
+    notificationNotSupportedDesc: "هذا المتصفح لا يدعم إشعارات سطح المكتب.",
+    prayerTimeIn5Mins: (prayerName: string) => `صلاة ${prayerName} بعد 5 دقائق.`,
+    prayerTimeNow: "حان وقت الصلاة",
+  },
+  en: {
+    title: "Prayer Pal",
+    loadingLocation: "Determining your location...",
+    welcome: "Welcome to Prayer Pal",
+    manualLocationPrompt: "Please select your location to display prayer times.",
+    changeLocation: "Change Location",
+    nextPrayer: "Next Prayer",
+    prayerNotifications: "Prayer Notifications",
+    notificationDesc: "Receive notifications for prayer times.",
+    enableNotifications: "Enable Notifications",
+    calculationInfo: "Calculation Info",
+    calculationMethodDesc: "The method used for prayer time calculation.",
+    method: "Method",
+    apiCredit: "Prayer times provided by",
+    country: "Country",
+    city: "City",
+    selectCountry: "Select a country",
+    selectCity: "Select a city",
+    searchCountry: "Search for a country...",
+    searchCity: "Search for a city...",
+    countryNotFound: "Country not found.",
+    cityNotFound: "City not found.",
+    getPrayerTimes: "Get Prayer Times",
+    notificationEnabled: "Enabled",
+    notificationEnabledDesc: "Prayer notifications are now active.",
+    notificationDisabled: "Disabled",
+    notificationDisabledDesc: "Prayer notifications have been turned off.",
+    notificationBlocked: "Blocked",
+    notificationBlockedDesc: "Notifications are blocked. Please enable them in your browser settings.",
+    notificationRequestSuccess: "Success!",
+    notificationRequestSuccessDesc: "Notifications have been enabled successfully.",
+    notificationRequestFailed: "Denied",
+    notificationRequestFailedDesc: "Notification permission was not granted.",
+    notificationError: "Error",
+    notificationErrorDesc: "An error occurred while requesting notification permission.",
+    notificationNotSupported: "Not Supported",
+    notificationNotSupportedDesc: "This browser does not support desktop notifications.",
+    prayerTimeIn5Mins: (prayerName: string) => `Time for ${prayerName} prayer in 5 minutes.`,
+    prayerTimeNow: "Prayer Time",
+  }
+};
 
 interface LocationFormProps {
   selectedCountry: string;
@@ -30,6 +113,7 @@ interface LocationFormProps {
   handleCountryChange: (countryName: string) => void;
   handleCityChange: (cityName: string) => void;
   handleManualLocationSubmit: (e: React.FormEvent) => void;
+  language: 'ar' | 'en';
 }
 
 const LocationForm = memo(({
@@ -39,29 +123,31 @@ const LocationForm = memo(({
   loading,
   handleCountryChange,
   handleCityChange,
-  handleManualLocationSubmit
+  handleManualLocationSubmit,
+  language,
 }: LocationFormProps) => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const t = translations[language];
 
   const selectedCountryData = useMemo(() => countries.find(c => c.name === selectedCountry), [selectedCountry]);
 
   return (
    <form onSubmit={handleManualLocationSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label>الدولة</Label>
+        <Label>{t.country}</Label>
         <Popover open={countryOpen} onOpenChange={setCountryOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full justify-between text-base md:text-sm">
-              {selectedCountryData ? selectedCountryData.arabicName : "اختر دولة"}
+              {selectedCountryData ? (language === 'ar' ? selectedCountryData.arabicName : selectedCountryData.name) : t.selectCountry}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0" position="popper">
             <Command>
-              <CommandInput placeholder="ابحث عن دولة..." />
+              <CommandInput placeholder={t.searchCountry} />
               <CommandList>
-                <CommandEmpty>لم يتم العثور على الدولة.</CommandEmpty>
+                <CommandEmpty>{t.countryNotFound}</CommandEmpty>
                 <CommandGroup>
                   {countries.map((country) => (
                     <CommandItem
@@ -73,7 +159,7 @@ const LocationForm = memo(({
                       }}
                     >
                       <Check className={cn("me-2 h-4 w-4", selectedCountry.toLowerCase() === country.name.toLowerCase() ? "opacity-100" : "opacity-0")} />
-                      {country.arabicName}
+                      {language === 'ar' ? country.arabicName : country.name}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -83,19 +169,19 @@ const LocationForm = memo(({
         </Popover>
       </div>
       <div className="space-y-2">
-        <Label>المدينة</Label>
+        <Label>{t.city}</Label>
         <Popover open={cityOpen} onOpenChange={setCityOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={cityOpen} className="w-full justify-between text-base md:text-sm" disabled={!selectedCountry}>
-              {selectedCity || "اختر مدينة"}
+              {selectedCity || t.selectCity}
               <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0" position="popper">
              <Command>
-              <CommandInput placeholder="ابحث عن مدينة..." />
+              <CommandInput placeholder={t.searchCity} />
                <CommandList>
-                <CommandEmpty>لم يتم العثور على مدينة.</CommandEmpty>
+                <CommandEmpty>{t.cityNotFound}</CommandEmpty>
                 <CommandGroup>
                   {availableCities.map((city) => (
                     <CommandItem
@@ -118,13 +204,12 @@ const LocationForm = memo(({
       </div>
       <Button type="submit" className="w-full" disabled={loading || !selectedCity || !selectedCountry}>
         {loading ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : <MapPin className="ms-2 h-4 w-4" />}
-        الحصول على أوقات الصلاة
+        {t.getPrayerTimes}
       </Button>
     </form>
   );
 });
 LocationForm.displayName = 'LocationForm';
-
 
 const ThemeSwitcher = () => {
     const [theme, setTheme] = useState('light');
@@ -151,6 +236,21 @@ const ThemeSwitcher = () => {
     );
 };
 
+const LanguageSwitcher = ({ language, setLanguage }: { language: string, setLanguage: (lang: 'ar' | 'en') => void }) => {
+    const toggleLanguage = () => {
+        const newLang = language === 'ar' ? 'en' : 'ar';
+        setLanguage(newLang);
+        localStorage.setItem('language', newLang);
+    };
+
+    return (
+        <Button onClick={toggleLanguage} variant="ghost" size="icon">
+            <Languages className="h-6 w-6" />
+            <span className="sr-only">Change language</span>
+        </Button>
+    );
+};
+
 type AppState = 'loading' | 'ready' | 'error' | 'geo-fallback';
 
 export default function Home() {
@@ -167,14 +267,28 @@ export default function Home() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { toast } = useToast();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [language, setLanguage] = useState<'ar' | 'en'>('ar');
+  const t = useMemo(() => translations[language], [language]);
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem('language');
+    if (savedLang === 'en' || savedLang === 'ar') {
+        setLanguage(savedLang);
+    }
+  }, []);
+
+  useEffect(() => {
+      document.documentElement.lang = language;
+      document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+  }, [language]);
 
   const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
     setAppState('loading');
     setError(null);
   
     try {
-      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
-      if (!geoResponse.ok) throw new Error('فشلت خدمة تحديد الموقع الجغرافي العكسي.');
+      const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${language}`);
+      if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.');
       
       const geoData = await geoResponse.json();
       const city = geoData.city || geoData.locality;
@@ -182,7 +296,7 @@ export default function Home() {
       const countryData = countries.find(c => c.code === countryCode);
 
       if (!countryData || !city) {
-        throw new Error("بلدك الذي تم اكتشافه غير مدعوم أو تعذر تحديد المدينة.");
+        throw new Error("Your detected country is not supported or city could not be determined.");
       }
       
       const method = countryData.method;
@@ -192,12 +306,13 @@ export default function Home() {
       const url = `https://api.aladhan.com/v1/timings/${dateString}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
   
       const response = await fetch(url);
-      if (!response.ok) throw new Error('فشل جلب أوقات الصلاة. يرجى التحقق من اتصالك بالإنترنت.');
+      if (!response.ok) throw new Error('Failed to fetch prayer times. Please check your internet connection.');
       const data: AladhanResponse = await response.json();
-      if (data.code !== 200) throw new Error(data.status || 'حدث خطأ غير معروف.');
+      if (data.code !== 200) throw new Error(data.status || 'An unknown error occurred.');
       
       setPrayerData(data.data);
-      setDisplayLocation(`${city}, ${countryData.arabicName}`);
+      const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
+      setDisplayLocation(`${city}, ${countryDisplayName}`);
       setSelectedCountry(countryData.name);
       setSelectedCity(city);
       setAvailableCities(countryData.cities);
@@ -206,9 +321,9 @@ export default function Home() {
     } catch (e: any) {
       setError(e.message);
       setAppState('geo-fallback');
-      toast({ variant: "destructive", title: "خطأ", description: e.message });
+      toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
-  }, [toast]);
+  }, [toast, t.notificationError, language]);
 
   const fetchPrayerTimesByCity = useCallback(async (city: string, countryName: string) => {
     setAppState('loading');
@@ -216,15 +331,15 @@ export default function Home() {
 
     try {
         const countryData = countries.find(c => c.name === countryName);
-        if (!countryData) throw new Error("الدولة المحددة غير صالحة.");
+        if (!countryData) throw new Error("Invalid country selected.");
 
         const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)},${encodeURIComponent(countryData.name)}`;
         
         const nominatimRes = await fetch(nominatimUrl, { headers: { 'User-Agent': 'PrayerPal/1.0' } });
-        if (!nominatimRes.ok) throw new Error('فشل خدمة تحويل الموقع إلى إحداثيات.');
+        if (!nominatimRes.ok) throw new Error('Failed to use location to coordinate service.');
         
         const nominatimData = await nominatimRes.json();
-        if (nominatimData.length === 0) throw new Error(`لم نتمكن من العثور على إحداثيات لـ ${city}.`);
+        if (nominatimData.length === 0) throw new Error(`Could not find coordinates for ${city}.`);
         
         const { lat, lon } = nominatimData[0];
         await fetchPrayerTimesFromCoords(parseFloat(lat), parseFloat(lon));
@@ -233,9 +348,9 @@ export default function Home() {
     } catch (e: any) {
         setError(e.message);
         setAppState('geo-fallback');
-        toast({ variant: "destructive", title: "خطأ", description: e.message });
+        toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
-  }, [toast, fetchPrayerTimesFromCoords]);
+  }, [toast, fetchPrayerTimesFromCoords, t.notificationError]);
 
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -245,18 +360,17 @@ export default function Home() {
         },
         (error) => {
           console.error("Geolocation permission failed:", error.message);
-          toast({ title: "تم رفض الوصول إلى الموقع", description: "يرجى تحديد موقعك يدويًا.", variant: "destructive" });
+          toast({ title: "Location access denied", description: "Please select your location manually.", variant: "destructive" });
           setAppState('geo-fallback');
         }
       );
     } else {
-      toast({ title: "تحديد الموقع الجغرافي غير مدعوم", description: "يرجى تحديد موقعك يدويًا." });
+      toast({ title: "Geolocation not supported", description: "Please select your location manually." });
       setAppState('geo-fallback');
     }
   }, [fetchPrayerTimesFromCoords, toast]);
   
   useEffect(() => {
-    // Check on mount if we already have permission.
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotificationsEnabled(true);
     } else {
@@ -271,8 +385,41 @@ export default function Home() {
 
   const prayerList = useMemo(() => {
     if (!prayerData) return [];
-    return getPrayerList(prayerData.timings, new Date(parseInt(prayerData.date.timestamp) * 1000));
-  }, [prayerData]);
+    return getPrayerList(prayerData.timings, new Date(parseInt(prayerData.date.timestamp) * 1000), language);
+  }, [prayerData, language]);
+  
+  useEffect(() => {
+      const timeoutIds = (window as any).prayerNotificationTimeouts || [];
+      timeoutIds.forEach(clearTimeout);
+      (window as any).prayerNotificationTimeouts = [];
+  
+      if (notificationsEnabled && prayerList.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
+          const now = new Date();
+          const newTimeoutIds: NodeJS.Timeout[] = [];
+  
+          prayerList.forEach(prayer => {
+              if (prayer.name === 'Sunrise' || prayer.name === 'Sunset') return;
+
+              const notificationTime = prayer.date.getTime() - 5 * 60 * 1000;
+              if (notificationTime > now.getTime()) {
+                  const timeoutId = setTimeout(() => {
+                      new Notification(t.prayerTimeNow, { 
+                        body: t.prayerTimeIn5Mins(prayer.displayName), 
+                        dir: language === 'ar' ? 'rtl' : 'ltr'
+                      });
+                  }, notificationTime - now.getTime());
+                  newTimeoutIds.push(timeoutId);
+              }
+          });
+          (window as any).prayerNotificationTimeouts = newTimeoutIds;
+      }
+  
+      return () => {
+          const timeoutIdsToClear = (window as any).prayerNotificationTimeouts || [];
+          timeoutIdsToClear.forEach(clearTimeout);
+      };
+  }, [notificationsEnabled, prayerList, language, t]);
+
 
   const { nextPrayer, countdown } = useMemo(() => {
     if (!prayerList.length) return { nextPrayer: null, countdown: '00:00:00' };
@@ -310,7 +457,7 @@ export default function Home() {
 
   const handleNotificationToggle = async (checked: boolean) => {
     if (!('Notification' in window)) {
-        toast({ variant: "destructive", title: "غير مدعوم", description: "هذا المتصفح لا يدعم إشعارات سطح المكتب." });
+        toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
         setNotificationsEnabled(false); 
         return;
     }
@@ -318,12 +465,12 @@ export default function Home() {
     if (checked) {
         if (Notification.permission === 'granted') {
             setNotificationsEnabled(true);
-            toast({ title: "تم التفعيل", description: "إشعارات الصلاة مفعلة الآن." });
+            toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
             return;
         }
 
         if (Notification.permission === 'denied') {
-            toast({ variant: "destructive", title: "محظور", description: "الإشعارات محظورة. يرجى تفعيلها في إعدادات المتصفح." });
+            toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
             setNotificationsEnabled(false);
             return;
         }
@@ -332,19 +479,19 @@ export default function Home() {
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
                 setNotificationsEnabled(true);
-                toast({ title: "نجاح!", description: "تم تفعيل الإشعارات بنجاح." });
+                toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
             } else {
                 setNotificationsEnabled(false);
-                toast({ variant: "destructive", title: "تم الرفض", description: "لم يتم منح إذن الإشعارات." });
+                toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
             }
         } catch (error) {
             console.error("Error requesting notification permission:", error);
             setNotificationsEnabled(false);
-            toast({ variant: "destructive", title: "خطأ", description: "حدث خطأ أثناء طلب إذن الإشعارات." });
+            toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
         }
     } else {
         setNotificationsEnabled(false);
-        toast({ title: "تم التعطيل", description: "تم إيقاف إشعارات الصلاة." });
+        toast({ title: t.notificationDisabled, description: t.notificationDisabledDesc });
     }
   };
   
@@ -352,7 +499,7 @@ export default function Home() {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Loader2 className="w-16 h-16 animate-spin text-primary" />
-        <p className="mt-4 text-lg font-semibold font-headline">جاري تحديد موقعك...</p>
+        <p className="mt-4 text-lg font-semibold font-headline">{t.loadingLocation}</p>
       </div>
     );
   }
@@ -362,9 +509,9 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline text-center text-3xl text-primary">أهلاً بك في رفيق الصلاة</CardTitle>
+            <CardTitle className="font-headline text-center text-3xl text-primary">{t.welcome}</CardTitle>
             <CardDescription className="text-center text-muted-foreground pt-2">
-              {error ? error : "الرجاء تحديد موقعك لعرض أوقات الصلاة."}
+              {error ? error : t.manualLocationPrompt}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -376,6 +523,7 @@ export default function Home() {
               handleCountryChange={handleCountryChange}
               handleCityChange={handleCityChange}
               handleManualLocationSubmit={handleManualLocationSubmit}
+              language={language}
             />
           </CardContent>
         </Card>
@@ -388,19 +536,24 @@ export default function Home() {
   }
 
   const { date } = prayerData;
+  const gregorianDate = language === 'ar' ? `${date.gregorian.weekday.ar}, ${date.readable}` : `${date.gregorian.weekday.en}, ${date.readable}`;
+  const hijriDate = language === 'ar' ? `${date.hijri.weekday.ar}, ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year} هـ` : `${date.hijri.weekday.en}, ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
       <header className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold font-headline text-primary">رفيق الصلاة</h1>
-        <ThemeSwitcher />
+        <h1 className="text-2xl font-bold font-headline text-primary">{t.title}</h1>
+        <div className='flex items-center gap-2'>
+            <LanguageSwitcher language={language} setLanguage={setLanguage} />
+            <ThemeSwitcher />
+        </div>
       </header>
 
       <main className="container mx-auto px-4 pb-8">
         
         <section className="text-center mb-8">
-          <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.readable}</p>
-          <p className="text-xl text-accent font-semibold">{date.hijri.weekday.ar}, {date.hijri.day} {date.hijri.month.ar} {date.hijri.year} هـ</p>
+          <p className="text-lg text-muted-foreground">{gregorianDate}</p>
+          <p className="text-xl text-accent font-semibold">{hijriDate}</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <MapPin className="w-5 h-5 text-muted-foreground" />
             <span className="text-lg text-foreground">{displayLocation}</span>
@@ -408,12 +561,12 @@ export default function Home() {
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <Pencil className="w-4 h-4" />
-                  <span className="sr-only">تغيير الموقع</span>
+                  <span className="sr-only">{t.changeLocation}</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>تغيير الموقع</DialogTitle>
+                  <DialogTitle>{t.changeLocation}</DialogTitle>
                 </DialogHeader>
                 <div className="pt-4">
                   <LocationForm 
@@ -424,6 +577,7 @@ export default function Home() {
                     handleCountryChange={handleCountryChange}
                     handleCityChange={handleCityChange}
                     handleManualLocationSubmit={handleManualLocationSubmit}
+                    language={language}
                   />
                 </div>
               </DialogContent>
@@ -435,8 +589,8 @@ export default function Home() {
           <section className="mb-10">
             <Card className="w-full max-w-2xl mx-auto bg-card border-primary/20 shadow-2xl shadow-primary/10">
               <CardHeader className="text-center pb-2">
-                <p className="text-lg text-primary font-semibold font-headline">الصلاة القادمة</p>
-                <CardTitle className="font-headline text-5xl text-foreground">{nextPrayer.arabicName}</CardTitle>
+                <p className="text-lg text-primary font-semibold font-headline">{t.nextPrayer}</p>
+                <CardTitle className="font-headline text-5xl text-foreground">{nextPrayer.displayName}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="font-mono text-6xl md:text-7xl font-bold text-primary tracking-tight">{countdown}</p>
@@ -454,7 +608,7 @@ export default function Home() {
                   prayer.name === nextPrayer?.name ? 'bg-primary/10 border-accent ring-2 ring-accent' : 'bg-card'
                   )}>
                   <CardHeader className="pb-2 pt-4">
-                    <CardTitle className="text-xl font-medium font-headline">{prayer.arabicName}</CardTitle>
+                    <CardTitle className="text-xl font-medium font-headline">{prayer.displayName}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold font-mono">{prayer.time}</div>
@@ -467,32 +621,32 @@ export default function Home() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="shadow-md">
             <CardHeader>
-                <CardTitle className="font-headline">إشعارات الصلاة</CardTitle>
-                <CardDescription>تلقي إشعارات لأوقات الصلاة.</CardDescription>
+                <CardTitle className="font-headline">{t.prayerNotifications}</CardTitle>
+                <CardDescription>{t.notificationDesc}</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="notifications" className="flex items-center gap-3 cursor-pointer">
                         <Bell className="w-6 h-6 text-accent"/>
-                        <span className="text-lg font-semibold">تفعيل الإشعارات</span>
+                        <span className="text-lg font-semibold">{t.enableNotifications}</span>
                     </Label>
                     <Switch 
                       id="notifications" 
                       checked={notificationsEnabled} 
                       onCheckedChange={handleNotificationToggle}
-                      aria-label="تفعيل أو تعطيل إشعارات الصلاة" 
+                      aria-label="Enable or disable prayer notifications" 
                     />
                 </div>
             </CardContent>
           </Card>
           <Card className="shadow-md">
             <CardHeader>
-                <CardTitle className="font-headline">معلومات الحساب</CardTitle>
-                <CardDescription>طريقة حساب أوقات الصلاة المستخدمة.</CardDescription>
+                <CardTitle className="font-headline">{t.calculationInfo}</CardTitle>
+                <CardDescription>{t.calculationMethodDesc}</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-lg">
-                <span className="font-semibold">الطريقة: </span> 
+                <span className="font-semibold">{t.method}: </span> 
                 {prayerData.meta.method.name}
               </p>
             </CardContent>
@@ -502,7 +656,7 @@ export default function Home() {
       </main>
       <footer className="text-center py-6 border-t mt-8">
         <p className="text-sm text-muted-foreground">
-            أوقات الصلاة مقدمة من <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>
+            {t.apiCredit} <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Aladhan API</a>
         </p>
       </footer>
     </div>

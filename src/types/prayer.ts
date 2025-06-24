@@ -39,6 +39,7 @@ export interface GregorianDate {
   day: string;
   weekday: {
     en: string;
+    ar: string;
   };
   month: {
     number: number;

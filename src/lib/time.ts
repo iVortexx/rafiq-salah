@@ -2,14 +2,14 @@ import { type PrayerTimings } from "@/types/prayer";
 
 export interface Prayer {
   name: string;
-  arabicName: string;
+  displayName: string;
   time: string;
   date: Date;
 }
 
 const PRAYER_NAMES: (keyof PrayerTimings)[] = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Sunset', 'Maghrib', 'Isha'];
 
-const PRAYER_NAME_MAP: { [key: string]: string } = {
+const ARABIC_PRAYER_NAME_MAP: { [key: string]: string } = {
   Fajr: 'الفجر',
   Sunrise: 'الشروق',
   Dhuhr: 'الظهر',
@@ -19,22 +19,19 @@ const PRAYER_NAME_MAP: { [key: string]: string } = {
   Isha: 'العشاء',
 };
 
-
-function formatTo12Hour(timeString: string): string {
+function formatTo12Hour(timeString: string, lang: 'ar' | 'en'): string {
   if (!timeString) return '';
   const [hours, minutes] = timeString.split(':').map(Number);
-  // Manual RTL support for AM/PM
-  const period = hours >= 12 ? 'م' : 'ص';
+  const period = hours >= 12 ? (lang === 'ar' ? 'م' : 'PM') : (lang === 'ar' ? 'ص' : 'AM');
   let hours12 = hours % 12;
   if (hours12 === 0) hours12 = 12; // Convert 0 to 12
   
   const formattedMinutes = minutes.toString().padStart(2, '0');
 
-  // Combine with Arabic period
-  return `${hours12}:${formattedMinutes}`;
+  return `${hours12}:${formattedMinutes} ${period}`;
 }
 
-export function getPrayerList(timings: PrayerTimings, date: Date): Prayer[] {
+export function getPrayerList(timings: PrayerTimings, date: Date, lang: 'ar' | 'en'): Prayer[] {
   return PRAYER_NAMES.map(name => {
     const timeString24 = timings[name];
     const [hours, minutes] = timeString24.split(':').map(Number);
@@ -42,8 +39,8 @@ export function getPrayerList(timings: PrayerTimings, date: Date): Prayer[] {
     prayerDate.setHours(hours, minutes, 0, 0);
     return { 
       name, 
-      arabicName: PRAYER_NAME_MAP[name],
-      time: formatTo12Hour(timeString24), 
+      displayName: lang === 'ar' ? ARABIC_PRAYER_NAME_MAP[name] : name,
+      time: formatTo12Hour(timeString24, lang), 
       date: prayerDate 
     };
   });
