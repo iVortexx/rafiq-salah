@@ -35,7 +35,7 @@ export default function Home() {
     notificationsEnabled,
     notificationStatus,
     handleNotificationToggle,
-  } = useNotifications(prayerData, language, t);
+  } = useNotifications(t);
   
   const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'light');
 
@@ -61,7 +61,9 @@ export default function Home() {
             handleCityChange={handleCityChange}
             handleManualLocationSubmit={handleManualLocationSubmit}
             language={language}
-            translations={t} loading={false}          />
+            translations={t} 
+            loading={false}
+          />
         )}
 
         {prayerData && (

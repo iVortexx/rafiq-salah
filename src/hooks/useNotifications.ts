@@ -1,65 +1,66 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import type { PrayerData } from '@/types/prayer';
-import { getPrayerList } from '@/lib/time';
+import { messaging } from '@/lib/firebase';
+import { getToken } from 'firebase/messaging';
 
-export function useNotifications(prayerData: PrayerData | null, language: 'ar' | 'en', t: any) {
+export function useNotifications(t: any) {
   const { toast } = useToast();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  // `notificationStatus` tracks the browser's permission state ('default', 'granted', 'denied')
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
+  
+  // `notificationsEnabled` reflects if we successfully got a token.
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  
+  // TODO: Replace this with your VAPID key from the Firebase console.
+  // Go to Project settings > Cloud Messaging > Web configuration > Generate key pair
+  const VAPID_KEY = 'YOUR_VAPID_KEY_FROM_FIREBASE';
 
-  const prayerList = useMemo(() => {
-    if (!prayerData) return [];
-    const date = new Date(parseInt(prayerData.date.timestamp, 10) * 1000);
-    return getPrayerList(prayerData.timings, date, language);
-  }, [prayerData, language]);
-
+  // Effect to check initial permission status and get token if already granted.
   useEffect(() => {
     if ('Notification' in window) {
-      const status = Notification.permission;
-      setNotificationStatus(status);
-      if (status === 'granted') {
-        setNotificationsEnabled(true);
+      const permission = Notification.permission;
+      setNotificationStatus(permission);
+      if (permission === 'granted') {
+        // If permission was already granted, we can enable notifications.
+        setupFcmToken();
       }
     }
   }, []);
 
-  useEffect(() => {
-      const timeoutIds: NodeJS.Timeout[] = (window as any).prayerNotificationTimeouts || [];
-      timeoutIds.forEach(clearTimeout);
-      (window as any).prayerNotificationTimeouts = [];
-  
-      if (notificationsEnabled && prayerList.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-          const now = new Date();
-          const newTimeoutIds: NodeJS.Timeout[] = [];
-  
-          prayerList.forEach(prayer => {
-              if (prayer.name === 'Sunrise' || prayer.name === 'Sunset') return;
-
-              const notificationTime = prayer.date.getTime() - 5 * 60 * 1000;
-              if (notificationTime > now.getTime()) {
-                  const timeoutId = setTimeout(() => {
-                      new Notification(t.prayerTimeNow, { 
-                        body: t.prayerTimeIn5Mins(prayer.displayName), 
-                        dir: language === 'ar' ? 'rtl' : 'ltr'
-                      });
-                  }, notificationTime - now.getTime());
-                  newTimeoutIds.push(timeoutId);
-              }
-          });
-          (window as any).prayerNotificationTimeouts = newTimeoutIds;
+  const setupFcmToken = async () => {
+    if (!messaging) {
+      console.error("Firebase Messaging is not available.");
+      // Don't toast here, it's a dev error.
+      return;
+    }
+    try {
+      const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+      if (currentToken) {
+        console.log('FCM Token:', currentToken);
+        // In a real app, you would send this token to your backend server
+        // to associate it with the user.
+        // Example: await fetch('/api/save-token', { method: 'POST', body: JSON.stringify({ token: currentToken }) });
+        setNotificationsEnabled(true);
+      } else {
+        // This case means permission is granted but no token is available.
+        // This can happen in some browser contexts.
+        console.log('No registration token available. A new one may be generated on next permission request.');
+        setNotificationsEnabled(false);
       }
-  
-      return () => {
-          const timeoutIdsToClear = (window as any).prayerNotificationTimeouts || [];
-          timeoutIdsToClear.forEach(clearTimeout);
-      };
-  }, [notificationsEnabled, prayerList, language, t]);
+    } catch (err) {
+      console.error('An error occurred while retrieving FCM token. ', err);
+      // The user will see this if their VAPID key is wrong or something else fails.
+      toast({ variant: "destructive", title: t.notificationError, description: "Could not get notification token." });
+      setNotificationsEnabled(false);
+    }
+  };
 
   const handleNotificationToggle = async (checked: boolean) => {
-    if (!('Notification' in window)) {
+    if (!checked) return; // The switch is disabled when on, so this shouldn't happen.
+
+    if (!('Notification' in window) || !messaging) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
         return;
     }
@@ -68,30 +69,17 @@ export function useNotifications(prayerData: PrayerData | null, language: 'ar' |
         toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
         return;
     }
-    
-    // If already granted, just enable the state and show a toast.
-    if (notificationStatus === 'granted') {
-        setNotificationsEnabled(true);
-        toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
-        return;
-    }
 
-    // Request permission if not already granted or denied
-    if (checked) {
-        try {
-            const permission = await Notification.requestPermission();
-            setNotificationStatus(permission);
-            if (permission === 'granted') {
-                setNotificationsEnabled(true);
-                toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
-            } else {
-                setNotificationsEnabled(false);
-                toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
-            }
-        } catch (error) {
-            setNotificationsEnabled(false);
-            toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
-        }
+    // This will trigger the browser's permission prompt.
+    const permission = await Notification.requestPermission();
+    setNotificationStatus(permission);
+
+    if (permission === 'granted') {
+      toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
+      await setupFcmToken();
+    } else {
+      toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
+      setNotificationsEnabled(false);
     }
   };
   
