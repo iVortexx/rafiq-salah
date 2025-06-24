@@ -396,7 +396,7 @@ export default function Home() {
       <main className="container mx-auto px-4 pb-8">
         
         <section className="text-center mb-8">
-          <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.gregorian.readable}</p>
+          <p className="text-lg text-muted-foreground">{date.gregorian.weekday.en}, {date.readable}</p>
           <p className="text-xl text-accent font-semibold">{date.hijri.weekday.ar}, {date.hijri.day} {date.hijri.month.ar} {date.hijri.year} هـ</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <MapPin className="w-5 h-5 text-muted-foreground" />
