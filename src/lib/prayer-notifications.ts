@@ -3,7 +3,7 @@
 
 import { firestore, messagingAdmin } from './firebase-admin';
 import type { AladhanResponse } from '@/types/prayer';
-import { findNextPrayer, PRAYER_NAMES, ARABIC_PRAYER_NAME_MAP } from './time';
+import { findNextPrayer, getPrayerListForDate } from './time';
 import { translations } from './translations';
 import { countries } from './locations';
 
@@ -11,8 +11,9 @@ import { countries } from './locations';
  * This function checks for upcoming prayers and sends notifications.
  * It's designed to be run on a schedule (e.g., every 5 minutes) by a service
  * like Firebase Scheduled Functions or a cron job.
+ * @param testOffsetMinutes - FOR TESTING ONLY: A number of minutes to check ahead for prayers. Defaults to 5.
  */
-export async function checkAndSendPrayerNotifications() {
+export async function checkAndSendPrayerNotifications(testOffsetMinutes?: number) {
   console.log('Running notification check...');
   const tokensSnapshot = await firestore.collection('fcmTokens').get();
 
@@ -32,6 +33,11 @@ export async function checkAndSendPrayerNotifications() {
       locationGroups[key].tokens.push(doc.id);
     }
   });
+
+  const notificationWindowMinutes = testOffsetMinutes || 5;
+  const isTest = !!testOffsetMinutes;
+  const NOTIFICATION_WINDOW_MS = notificationWindowMinutes * 60 * 1000;
+
 
   for (const groupKey in locationGroups) {
     const [location, lang] = groupKey.split('|');
@@ -72,38 +78,25 @@ export async function checkAndSendPrayerNotifications() {
       // Crucial: Create a date object representing the current moment *in the prayer's local timezone*.
       const nowInLocationTimezone = new Date(new Date().toLocaleString('en-US', { timeZone: meta.timezone }));
       
-      // Build a list of prayer times as Date objects for today, correctly grounded in the location's timezone.
-      const prayerList = PRAYER_NAMES.map(name => {
-          const timeString24 = timings[name as keyof typeof timings];
-          const [hours, minutes] = timeString24.split(':').map(Number);
-          
-          // Use the location's "today" to construct the prayer time, preventing timezone-off-by-one-day errors.
-          const prayerDate = new Date(nowInLocationTimezone); 
-          prayerDate.setHours(hours, minutes, 0, 0);
-
-          return {
-            name,
-            displayName: language === 'ar' ? ARABIC_PRAYER_NAME_MAP[name] : name,
-            date: prayerDate
-          };
-      });
-      
-      // `findNextPrayer` now gets the correct current time for the location
+      const prayerList = getPrayerListForDate(timings, nowInLocationTimezone, language);
       const nextPrayer = findNextPrayer(prayerList, nowInLocationTimezone);
 
       if (nextPrayer) {
         const timeToPrayer = nextPrayer.date.getTime() - nowInLocationTimezone.getTime();
-        const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
 
-        // Check if the next prayer is within our 5-minute notification window
-        if (timeToPrayer > 0 && timeToPrayer <= FIVE_MINUTES_IN_MS) {
+        // Check if the next prayer is within our notification window
+        if (timeToPrayer > 0 && timeToPrayer <= NOTIFICATION_WINDOW_MS) {
           const { tokens } = locationGroups[groupKey];
           const t = translations[language];
+
+          const notificationBody = isTest 
+            ? `TEST: Time for ${nextPrayer.displayName} prayer in <${notificationWindowMinutes} mins.`
+            : t.prayerTimeIn5Mins(nextPrayer.displayName);
 
           const messagePayload = {
             notification: {
               title: t.prayerTimeNow,
-              body: t.prayerTimeIn5Mins(nextPrayer.displayName),
+              body: notificationBody,
               icon: '/icon-192x192.png'
             },
             webpush: {
@@ -114,7 +107,7 @@ export async function checkAndSendPrayerNotifications() {
             tokens: tokens,
           };
 
-          console.log(`Sending notification for ${nextPrayer.displayName} (in <5 mins) to ${tokens.length} users in ${location}`);
+          console.log(`Sending notification for ${nextPrayer.displayName} (in <${notificationWindowMinutes} mins) to ${tokens.length} users in ${location}`);
           const batchResponse = await messagingAdmin.sendEachForMulticast(messagePayload);
           
           // Clean up invalid tokens after sending

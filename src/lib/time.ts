@@ -1,3 +1,4 @@
+
 import { type PrayerTimings, type DateInfo } from "@/types/prayer";
 
 export interface Prayer {
@@ -31,6 +32,9 @@ function formatTo12Hour(timeString: string, lang: 'ar' | 'en'): string {
   return `${hours12}:${formattedMinutes} ${period}`;
 }
 
+/**
+ * For client-side use. Creates a list of prayers for the user's current day.
+ */
 export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 'ar' | 'en'): Prayer[] {
   return PRAYER_NAMES.map(name => {
     const timeString24 = timings[name];
@@ -50,6 +54,29 @@ export function getPrayerList(timings: PrayerTimings, dateInfo: DateInfo, lang: 
     };
   });
 }
+
+/**
+ * For server-side use. Creates a list of prayers based on a specific date object for a location.
+ */
+export function getPrayerListForDate(timings: PrayerTimings, locationDate: Date, lang: 'ar' | 'en'): Prayer[] {
+  return PRAYER_NAMES.map(name => {
+    const timeString24 = timings[name];
+    const [hours, minutes] = timeString24.split(':').map(Number);
+    
+    // Create a new Date object based on the provided location's date to ensure timezone correctness.
+    const prayerDate = new Date(locationDate); 
+    // Set the time of this Date object to the prayer's time.
+    prayerDate.setHours(Number(hours), Number(minutes), 0, 0); 
+
+    return { 
+      name, 
+      displayName: lang === 'ar' ? ARABIC_PRAYER_NAME_MAP[name] : name,
+      time: formatTo12Hour(timeString24, lang), 
+      date: prayerDate 
+    };
+  });
+}
+
 
 export function findNextPrayer(prayerList: { name: string, date: Date }[], currentTime: Date): { name: string, date: Date } | null {
   const nextPrayer = prayerList.find(prayer => prayer.date > currentTime);
