@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
 import { countries, type City, type Country } from '@/lib/locations';
-import { Sun, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon, Languages } from 'lucide-react';
+import { Sun, MapPin, Bell, Loader2, Pencil, Check, ChevronsUpDown, MoonIcon, SunIcon, Languages, ChevronDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const translations = {
   ar: {
@@ -31,7 +32,7 @@ const translations = {
     changeLocation: "تغيير الموقع",
     nextPrayer: "الصلاة القادمة",
     prayerNotifications: "إشعارات الصلاة",
-    notificationDesc: "تلقي إشعارات لأوقات الصلاة.",
+    notificationDesc: "لتلقي إشعار قبل 5 دقائق من كل صلاة. لا يمكن إيقافها إلا من إعدادات المتصفح.",
     enableNotifications: "تفعيل الإشعارات",
     calculationInfo: "معلومات الحساب",
     calculationMethodDesc: "طريقة حساب أوقات الصلاة المستخدمة.",
@@ -71,7 +72,7 @@ const translations = {
     changeLocation: "Change Location",
     nextPrayer: "Next Prayer",
     prayerNotifications: "Prayer Notifications",
-    notificationDesc: "Receive notifications for prayer times.",
+    notificationDesc: "Get notified 5 minutes before each prayer. Can only be disabled from browser settings.",
     enableNotifications: "Enable Notifications",
     calculationInfo: "Calculation Info",
     calculationMethodDesc: "The method used for prayer time calculation.",
@@ -236,18 +237,50 @@ const ThemeSwitcher = () => {
     );
 };
 
-const LanguageSwitcher = ({ language, setLanguage }: { language: string, setLanguage: (lang: 'ar' | 'en') => void }) => {
-    const toggleLanguage = () => {
-        const newLang = language === 'ar' ? 'en' : 'ar';
+const USFlag = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 18" className="rounded-sm">
+    <path fill="#0A3161" d="M0 0h12v10H0z"/>
+    <path fill="#FFF" d="M1.5 1.5h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z m-9 2h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z m-9 2h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z m3 0h1v1h-1z"/>
+    <path fill="#B22234" d="M0 2h24v2H0zm0 4h24v2H0zm0 4h24v2H0zm0 4h24v2H0z"/>
+    <path fill="#FFF" d="M0 0h24v2H0zm0 4h24v2H0zm12 4h12v2H12zm0 4h12v2H12z"/>
+  </svg>
+);
+
+const EgyptFlag = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 9 6" className="rounded-sm">
+    <path fill="#C8102E" d="M0 0h9v2H0z"/>
+    <path fill="#FFF" d="M0 2h9v2H0z"/>
+    <path d="M0 4h9v2H0z"/>
+    <path fill="#CDBA00" d="M4.5 2.5c.2 0 .4.2.4.4v.2h-.8v-.2c0-.2.2-.4.4-.4zm0 .2c.1 0 .2.1.2.2v.1h-.4v-.1c0-.1.1-.2.2-.2zM4.1 3.3h.8v.2h-.8z"/>
+  </svg>
+);
+
+const LanguageSwitcher = ({ language, setLanguage }: { language: 'ar' | 'en', setLanguage: (lang: 'ar' | 'en') => void }) => {
+    const handleLanguageChange = (newLang: 'ar' | 'en') => {
         setLanguage(newLang);
         localStorage.setItem('language', newLang);
     };
 
     return (
-        <Button onClick={toggleLanguage} variant="ghost" size="icon">
-            <Languages className="h-6 w-6" />
-            <span className="sr-only">Change language</span>
-        </Button>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 px-2">
+                    <Languages className="h-5 w-5" />
+                    <span className="uppercase font-bold">{language}</span>
+                    <ChevronDown className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleLanguageChange('en')} className="gap-2 cursor-pointer">
+                    <USFlag />
+                    <span>English</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleLanguageChange('ar')} className="gap-2 cursor-pointer">
+                    <EgyptFlag />
+                    <span>العربية</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 };
 
@@ -265,6 +298,8 @@ export default function Home() {
   const [displayLocation, setDisplayLocation] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
+
   const { toast } = useToast();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
@@ -371,12 +406,15 @@ export default function Home() {
   }, [fetchPrayerTimesFromCoords, toast]);
   
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      setNotificationsEnabled(true);
-    } else {
-      setNotificationsEnabled(false);
+    if ('Notification' in window) {
+      const status = Notification.permission;
+      setNotificationStatus(status);
+      if (status === 'granted') {
+        setNotificationsEnabled(true);
+      }
     }
   }, []);
+
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -456,42 +494,37 @@ export default function Home() {
   }, [selectedCity, selectedCountry, fetchPrayerTimesByCity]);
 
   const handleNotificationToggle = async (checked: boolean) => {
+    if (!checked) return;
+
     if (!('Notification' in window)) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
-        setNotificationsEnabled(false); 
         return;
     }
 
-    if (checked) {
-        if (Notification.permission === 'granted') {
-            setNotificationsEnabled(true);
-            toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
-            return;
-        }
+    if (notificationStatus === 'denied') {
+        toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
+        return;
+    }
 
-        if (Notification.permission === 'denied') {
-            toast({ variant: "destructive", title: t.notificationBlocked, description: t.notificationBlockedDesc });
+    if (notificationStatus === 'granted') {
+        toast({ title: t.notificationEnabled, description: t.notificationEnabledDesc });
+        return;
+    }
+
+    try {
+        const permission = await Notification.requestPermission();
+        setNotificationStatus(permission);
+        if (permission === 'granted') {
+            setNotificationsEnabled(true);
+            toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
+        } else {
             setNotificationsEnabled(false);
-            return;
+            toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
         }
-        
-        try {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                setNotificationsEnabled(true);
-                toast({ title: t.notificationRequestSuccess, description: t.notificationRequestSuccessDesc });
-            } else {
-                setNotificationsEnabled(false);
-                toast({ variant: "destructive", title: t.notificationRequestFailed, description: t.notificationRequestFailedDesc });
-            }
-        } catch (error) {
-            console.error("Error requesting notification permission:", error);
-            setNotificationsEnabled(false);
-            toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
-        }
-    } else {
+    } catch (error) {
+        console.error("Error requesting notification permission:", error);
         setNotificationsEnabled(false);
-        toast({ title: t.notificationDisabled, description: t.notificationDisabledDesc });
+        toast({ variant: "destructive", title: t.notificationError, description: t.notificationErrorDesc });
     }
   };
   
@@ -499,7 +532,7 @@ export default function Home() {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Loader2 className="w-16 h-16 animate-spin text-primary" />
-        <p className="mt-4 text-lg font-semibold font-headline">{t.loadingLocation}</p>
+        <p className="mt-4 text-lg font-semibold">{t.loadingLocation}</p>
       </div>
     );
   }
@@ -509,7 +542,7 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Card className="w-full max-w-md mx-4 p-4 shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline text-center text-3xl text-primary">{t.welcome}</CardTitle>
+            <CardTitle className="font-bold text-center text-3xl text-primary">{t.welcome}</CardTitle>
             <CardDescription className="text-center text-muted-foreground pt-2">
               {error ? error : t.manualLocationPrompt}
             </CardDescription>
@@ -540,9 +573,9 @@ export default function Home() {
   const hijriDate = language === 'ar' ? `${date.hijri.weekday.ar}, ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year} هـ` : `${date.hijri.weekday.en}, ${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold font-headline text-primary">{t.title}</h1>
+        <h1 className="text-2xl font-bold text-primary">{t.title}</h1>
         <div className='flex items-center gap-2'>
             <LanguageSwitcher language={language} setLanguage={setLanguage} />
             <ThemeSwitcher />
@@ -589,8 +622,8 @@ export default function Home() {
           <section className="mb-10">
             <Card className="w-full max-w-2xl mx-auto bg-card border-primary/20 shadow-2xl shadow-primary/10">
               <CardHeader className="text-center pb-2">
-                <p className="text-lg text-primary font-semibold font-headline">{t.nextPrayer}</p>
-                <CardTitle className="font-headline text-5xl text-foreground">{nextPrayer.displayName}</CardTitle>
+                <p className="text-lg text-primary font-semibold">{t.nextPrayer}</p>
+                <CardTitle className="font-bold text-5xl text-foreground">{nextPrayer.displayName}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="font-mono text-6xl md:text-7xl font-bold text-primary tracking-tight">{countdown}</p>
@@ -608,7 +641,7 @@ export default function Home() {
                   prayer.name === nextPrayer?.name ? 'bg-primary/10 border-accent ring-2 ring-accent' : 'bg-card'
                   )}>
                   <CardHeader className="pb-2 pt-4">
-                    <CardTitle className="text-xl font-medium font-headline">{prayer.displayName}</CardTitle>
+                    <CardTitle className="text-xl font-medium">{prayer.displayName}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold font-mono">{prayer.time}</div>
@@ -621,7 +654,7 @@ export default function Home() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="shadow-md">
             <CardHeader>
-                <CardTitle className="font-headline">{t.prayerNotifications}</CardTitle>
+                <CardTitle className="font-bold">{t.prayerNotifications}</CardTitle>
                 <CardDescription>{t.notificationDesc}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -634,14 +667,15 @@ export default function Home() {
                       id="notifications" 
                       checked={notificationsEnabled} 
                       onCheckedChange={handleNotificationToggle}
-                      aria-label="Enable or disable prayer notifications" 
+                      disabled={notificationsEnabled || notificationStatus === 'denied'}
+                      aria-label="Enable prayer notifications" 
                     />
                 </div>
             </CardContent>
           </Card>
           <Card className="shadow-md">
             <CardHeader>
-                <CardTitle className="font-headline">{t.calculationInfo}</CardTitle>
+                <CardTitle className="font-bold">{t.calculationInfo}</CardTitle>
                 <CardDescription>{t.calculationMethodDesc}</CardDescription>
             </CardHeader>
             <CardContent>
