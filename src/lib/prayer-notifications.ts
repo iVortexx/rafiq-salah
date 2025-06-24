@@ -21,8 +21,6 @@ export async function checkAndSendPrayerNotifications() {
     return;
   }
 
-  // Group tokens by location. This is crucial for efficiency, so we only fetch
-  // prayer times once per location.
   const locationGroups: { [key: string]: { tokens: string[]; language: 'ar' | 'en' } } = {};
   tokensSnapshot.forEach(doc => {
     const data = doc.data();
@@ -37,7 +35,6 @@ export async function checkAndSendPrayerNotifications() {
 
   const now = new Date();
 
-  // Process each location group
   for (const groupKey in locationGroups) {
     const [location, lang] = groupKey.split('|');
     const [city, country] = location.split(',').map(s => s.trim());
@@ -46,7 +43,6 @@ export async function checkAndSendPrayerNotifications() {
     if (!city || !country) continue;
 
     try {
-      // Find country data to get the calculation method
       const countryData = countries.find(c => c.name === country || c.arabicName === country);
       if (!countryData) {
         console.warn(`Could not find country data for: ${country}`);
@@ -63,7 +59,6 @@ export async function checkAndSendPrayerNotifications() {
       const today = new Date();
       const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
 
-      // Fetch prayer times for this location
       const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${cityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
       const response = await fetch(url);
       const prayerData: AladhanResponse = await response.json();
@@ -73,9 +68,7 @@ export async function checkAndSendPrayerNotifications() {
         continue;
       }
 
-      // **FIXED LOGIC**: Create timezone-correct prayer list using the API's UTC timestamp.
       const { timings, date: dateInfo } = prayerData.data;
-      // The timestamp from the API is for midnight in the location's timezone.
       const midnightInLocation = new Date(parseInt(dateInfo.timestamp, 10) * 1000);
 
       const prayerList = PRAYER_NAMES.map(name => {
@@ -83,7 +76,6 @@ export async function checkAndSendPrayerNotifications() {
           const [hours, minutes] = timeString24.split(':').map(Number);
           
           const prayerDate = new Date(midnightInLocation.getTime());
-          // This correctly sets the time on a date object that's already in the right timezone's midnight.
           prayerDate.setHours(hours, minutes, 0, 0);
 
           return {
@@ -99,8 +91,6 @@ export async function checkAndSendPrayerNotifications() {
         const timeToPrayer = nextPrayer.date.getTime() - now.getTime();
         const minutesToPrayer = Math.round(timeToPrayer / (1000 * 60));
 
-        // Check if the prayer is ~5 minutes away.
-        // This check assumes the function runs frequently (e.g., every minute or every 5 minutes).
         if (minutesToPrayer === 5) {
           const { tokens } = locationGroups[groupKey];
           const t = translations[language];
@@ -109,18 +99,34 @@ export async function checkAndSendPrayerNotifications() {
             notification: {
               title: t.prayerTimeNow,
               body: t.prayerTimeIn5Mins(nextPrayer.displayName),
-              icon: '/icon-192x192.png' // Optional: Add an icon for the notification
+              icon: '/icon-192x192.png'
             },
             webpush: {
                 fcm_options: {
-                    link: '/' // Optional: Link to open when notification is clicked
+                    link: '/'
                 }
             },
             tokens: tokens,
           };
 
           console.log(`Sending notification for ${nextPrayer.displayName} to ${tokens.length} users in ${location}`);
-          await messagingAdmin.sendEachForMulticast(messagePayload);
+          const batchResponse = await messagingAdmin.sendEachForMulticast(messagePayload);
+          
+          if (batchResponse.failureCount > 0) {
+            const tokensToDelete: Promise<any>[] = [];
+            batchResponse.responses.forEach((resp, idx) => {
+              if (!resp.success) {
+                const errorCode = resp.error?.code;
+                // Check for errors indicating the token is no longer valid
+                if (errorCode === 'messaging/registration-token-not-registered') {
+                  const failedToken = tokens[idx];
+                  console.log(`Token ${failedToken} is no longer registered. Deleting.`);
+                  tokensToDelete.push(firestore.collection('fcmTokens').doc(failedToken).delete());
+                }
+              }
+            });
+            await Promise.all(tokensToDelete);
+          }
         }
       }
     } catch (error) {
