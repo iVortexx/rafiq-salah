@@ -35,12 +35,24 @@ export default function Home() {
     notificationsEnabled,
     notificationStatus,
     handleNotificationToggle,
-  } = useNotifications(t);
+  } = useNotifications(t, displayLocation, language);
   
   const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'light');
 
+  const locationFormProps = {
+    selectedCountry,
+    selectedCity,
+    availableCities,
+    loading: appState === 'loading',
+    handleCountryChange,
+    handleCityChange,
+    handleManualLocationSubmit,
+    language,
+    translations: t,
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground font-sans">
       <Header 
         title={t.title} 
         language={language} 
@@ -54,15 +66,8 @@ export default function Home() {
         {appState === 'geo-fallback' && !prayerData && (
            <GeoFallbackState
             error={error}
-            selectedCountry={selectedCountry}
-            selectedCity={selectedCity}
-            availableCities={availableCities}
-            handleCountryChange={handleCountryChange}
-            handleCityChange={handleCityChange}
-            handleManualLocationSubmit={handleManualLocationSubmit}
-            language={language}
             translations={t} 
-            loading={false}
+            locationFormProps={locationFormProps}
           />
         )}
 
@@ -72,19 +77,12 @@ export default function Home() {
             displayLocation={displayLocation}
             isLocationModalOpen={isLocationModalOpen}
             setIsLocationModalOpen={setIsLocationModalOpen}
-            selectedCountry={selectedCountry}
-            selectedCity={selectedCity}
-            availableCities={availableCities}
-            handleCountryChange={handleCountryChange}
-            handleCityChange={handleCityChange}
-            handleManualLocationSubmit={handleManualLocationSubmit}
+            locationFormProps={locationFormProps}
             notificationsEnabled={notificationsEnabled}
             notificationStatus={notificationStatus}
             handleNotificationToggle={handleNotificationToggle}
             language={language}
             translations={t}
-            loading={appState === 'loading'}
-            appState={appState}
           />
         )}
       </main>

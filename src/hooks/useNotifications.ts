@@ -1,30 +1,24 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { messaging } from '@/lib/firebase';
 import { getToken } from 'firebase/messaging';
 
-export function useNotifications(t: any) {
+export function useNotifications(t: any, location: string, language: 'ar' | 'en') {
   const { toast } = useToast();
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_KEY;
 
-  useEffect(() => {
-    if ('Notification' in window) {
-      const permission = Notification.permission;
-      setNotificationStatus(permission);
-      if (permission === 'granted') {
-        setupFcmToken();
-      }
-    }
-  }, []);
-
-  const setupFcmToken = async () => {
+  const setupFcmToken = useCallback(async () => {
     if (!messaging || !VAPID_KEY) {
       console.error("Firebase Messaging or VAPID key is not configured in .env.local");
+      return;
+    }
+    if (!location || !language) {
+      // Don't try to get a token if we don't have location info yet
       return;
     }
     try {
@@ -37,7 +31,7 @@ export function useNotifications(t: any) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ token: currentToken }),
+          body: JSON.stringify({ token: currentToken, location, language }),
         });
         setNotificationsEnabled(true);
       } else {
@@ -49,10 +43,28 @@ export function useNotifications(t: any) {
       toast({ variant: "destructive", title: t.notificationError, description: "Could not get notification token. Ensure your VAPID key is correct." });
       setNotificationsEnabled(false);
     }
-  };
+  }, [VAPID_KEY, location, language, t.notificationError, toast]);
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      const permission = Notification.permission;
+      setNotificationStatus(permission);
+      if (permission === 'granted') {
+        setNotificationsEnabled(true);
+        // We call setupFcmToken here, and it will only proceed if location is available.
+        setupFcmToken();
+      }
+    }
+  }, [setupFcmToken]);
+
 
   const handleNotificationToggle = async (checked: boolean) => {
-    if (!checked) return;
+    if (!checked) {
+        // Here you might want to call a backend endpoint to delete the token
+        // For simplicity, we'll just disable it on the client
+        setNotificationsEnabled(false);
+        return;
+    }
 
     if (!('Notification' in window) || !messaging) {
         toast({ variant: "destructive", title: t.notificationNotSupported, description: t.notificationNotSupportedDesc });
