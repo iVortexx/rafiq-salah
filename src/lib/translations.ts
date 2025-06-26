@@ -22,7 +22,7 @@ export const translations = {
     searchCity: "ابحث عن مدينة...",
     countryNotFound: "لم يتم العثور على الدولة.",
     cityNotFound: "لم يتم العثور على مدينة.",
-    getPrayerTimes: "الحصول على أوقات الصلاة",
+    getPrayerTimes: "عرض أوقات الصلاة",
     notificationEnabled: "تم التفعيل",
     notificationEnabledDesc: "إشعارات الصلاة مفعلة الآن.",
     notificationDisabled: "تم التعطيل",
@@ -44,31 +44,29 @@ export const translations = {
     geolocationNotSupported: "تحديد الموقع غير مدعوم",
     geolocationNotSupportedDesc: "متصفحك لا يدعم هذه الميزة. يرجى تحديد موقعك يدويًا.",
     cityNotMatched: "لم نتمكن من مطابقة مدينتك",
+    orSelectManually: "أو اختر يدوياً",
 
     // Settings page translations
-    prayerSettings: "إعدادات الصلاة",
+    prayerSettings: "الإعدادات",
     calculationSettings: "إعدادات الحساب",
-    calculationSettingsDesc: "اختر بين الإعدادات الموصى بها أو قم بتخصيص حسابات أوقات الصلاة",
+    calculationSettingsDesc: "حدد طريقة الحساب والمذهب الفقهي المفضل لديك",
     locationSettings: "إعدادات الموقع",
-    locationSettingsDesc: "حدد موقعك للحصول على أوقات صلاة دقيقة",
-    timeAdjustments: "تعديلات الوقت",
-    timeAdjustmentsDesc: "قم بتكوين التوقيت الصيفي وإعدادات أخرى متعلقة بالوقت",
+    locationSettingsDesc: "استخدم الكشف التلقائي أو حدد موقعك يدويًا للحصول على أوقات صلاة دقيقة.",
+    timeAdjustments: "تعديلات الوقت والتنسيق",
+    timeAdjustmentsDesc: "قم بتعديل إزاحة الساعات يدويًا لمراعاة التوقيت الصيفي أو فروق المناطق الزمنية.",
     notifications: "الإشعارات",
     notificationsDesc: "إدارة إشعارات وتنبيهات أوقات الصلاة",
-    useRecommendedSettings: "استخدام الإعدادات الموصى بها",
-    useRecommendedSettingsDesc: "تكوين أوقات الصلاة تلقائياً بناءً على موقعك",
-    useManualLocation: "استخدام الموقع اليدوي",
-    useManualLocationDesc: "اختر بلدك ومدينتك يدوياً لأوقات الصلاة",
     enableNotificationsDesc: "تلقي تنبيهات لأوقات الصلاة",
     timeCalculation: "حساب الوقت",
     calculationMethod: "طريقة الحساب",
     juristicMethod: "المذهب الفقهي",
-    manualSettings: "الإعدادات اليدوية",
+    manualSettings: "الإعدادات المتقدمة",
     highLatitudeAdjustment: "تعديل خطوط العرض العالية",
     prayerTimeAdjustments: "تعديلات أوقات الصلاة (بالدقائق)",
-    daylightSavingTime: "التوقيت الصيفي",
-    saveSettings: "حفظ الإعدادات",
-    settingsSaved: "تم حفظ الإعدادات بنجاح!",
+    hourAdjustment: "تعديل الساعات",
+    saveSettings: "حفظ وتطبيق التغييرات",
+    settingsSaved: "تم حفظ الإعدادات",
+    settingsSavedDesc: "تم تطبيق إعداداتك الجديدة بنجاح.",
 
     // Prayer names
     fajr: "الفجر",
@@ -84,11 +82,11 @@ export const translations = {
     makkah: "جامعة أم القرى، مكة المكرمة",
     karachi: "جامعة العلوم الإسلامية، كراتشي",
     tehran: "معهد الجيوفيزياء، جامعة طهران",
-    jafari: "الشيعة الإثنا عشرية، معهد لوا، قم",
+    jafari: "الشيعة الإثنا عشرية",
 
     // Juristic methods
-    standard: "المعيار (الحنفي، المالكي، الشافعي، الحنبلي)",
-    hanafi: "الحنفي",
+    standard: "شافعي، مالكي، حنبلي",
+    hanafi: "حنفي",
 
     // High latitude options
     none: "لا شيء",
@@ -97,7 +95,7 @@ export const translations = {
     anglebased: "على أساس الزاوية",
 
     // Daylight saving options
-    noAdjustment: "بدون تعديل (0)",
+    noAdjustment: "لا تعديل (0)",
     plusOneHour: "+1 ساعة",
     minusOneHour: "-1 ساعة",
 
@@ -111,10 +109,9 @@ export const translations = {
       Qatar: "قطر",
     },
 
-    // --- Add below in ar ---
     noLocationSaved: "لم يتم حفظ موقع بعد",
     locationSet: "تم تعيين الموقع",
-    currentLocation: "الموقع الحالي",
+    currentLocation: "الموقع المحدد حاليًا",
     useCurrentLocation: "استخدم موقعي الحالي",
     retryGeolocation: "إعادة المحاولة باستخدام الموقع الحالي",
   },
@@ -163,31 +160,29 @@ export const translations = {
     geolocationNotSupported: "Geolocation Not Supported",
     geolocationNotSupportedDesc: "Your browser does not support this feature. Please select your location manually.",
     cityNotMatched: "Could not match your city",
+    orSelectManually: "Or select manually",
 
     // Settings page translations
-    prayerSettings: "Prayer Settings",
+    prayerSettings: "Settings",
     calculationSettings: "Calculation Settings",
-    calculationSettingsDesc: "Choose between recommended settings or customize your prayer time calculations",
+    calculationSettingsDesc: "Select your preferred calculation method and juristic school.",
     locationSettings: "Location Settings",
-    locationSettingsDesc: "Set your location for accurate prayer times",
-    timeAdjustments: "Time Adjustments",
-    timeAdjustmentsDesc: "Configure daylight saving time and other time-related settings",
+    locationSettingsDesc: "Use automatic detection or manually set your location for accurate prayer times.",
+    timeAdjustments: "Time & Format Settings",
+    timeAdjustmentsDesc: "Manually adjust hour offsets for DST or timezone differences.",
     notifications: "Notifications",
     notificationsDesc: "Manage prayer time notifications and alerts",
-    useRecommendedSettings: "Use Recommended Settings",
-    useRecommendedSettingsDesc: "Automatically configure prayer times based on your location",
-    useManualLocation: "Use Manual Location",
-    useManualLocationDesc: "Manually select your country and city for prayer times",
     enableNotificationsDesc: "Receive alerts for prayer times",
     timeCalculation: "Time Calculation",
     calculationMethod: "Calculation Method",
     juristicMethod: "Juristic Method",
-    manualSettings: "Manual Settings",
+    manualSettings: "Advanced Settings",
     highLatitudeAdjustment: "High Latitude Adjustment",
     prayerTimeAdjustments: "Prayer Time Adjustments (minutes)",
-    daylightSavingTime: "Daylight Saving Time",
-    saveSettings: "Save Settings",
-    settingsSaved: "Settings saved successfully!",
+    hourAdjustment: "Hour Adjustment",
+    saveSettings: "Save and Apply Changes",
+    settingsSaved: "Settings Saved",
+    settingsSavedDesc: "Your new settings have been applied.",
 
     // Prayer names
     fajr: "Fajr",
@@ -203,10 +198,10 @@ export const translations = {
     makkah: "Umm Al-Qura University, Makkah",
     karachi: "University of Islamic Sciences, Karachi",
     tehran: "Institute of Geophysics, University of Tehran",
-    jafari: "Shia Ithna-Ashari, Leva Institute, Qum",
+    jafari: "Shia Ithna-Ashari",
 
     // Juristic methods
-    standard: "Standard (Hanafi, Maliki, Shafi'i, Hanbali)",
+    standard: "Shafi, Maliki, Hanbali",
     hanafi: "Hanafi",
 
     // High latitude options
@@ -230,11 +225,10 @@ export const translations = {
       Qatar: "Qatar",
     },
 
-    // --- Add below in en ---
     noLocationSaved: "No location saved yet",
     locationSet: "Location set",
-    currentLocation: "Current Location",
-    useCurrentLocation: "Use Current Location",
+    currentLocation: "Currently Selected Location",
+    useCurrentLocation: "Use My Current Location",
     retryGeolocation: "Retry using current location",
   },
 }

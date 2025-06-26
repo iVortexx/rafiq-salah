@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { PrayerData } from '@/types/prayer';
 import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
 import { useCurrentTime } from '@/hooks/useCurrentTime';
@@ -10,31 +10,27 @@ import { LocationDisplay } from './LocationDisplay';
 import { NextPrayerCard } from './NextPrayerCard';
 import { PrayerGrid } from './PrayerGrid';
 import { Settings } from './Settings';
-import type { LocationFormProps } from '@/components/prayer/LocationForm';
 
-interface PrayerTimesViewProps extends Omit<LocationFormProps, 'translations'> {
+interface PrayerTimesViewProps {
   prayerData: PrayerData;
   displayLocation: string;
-  isLocationModalOpen: boolean;
-  setIsLocationModalOpen: (isOpen: boolean) => void;
+  onLocationSet: (country: string, city: string) => void;
   notificationsEnabled: boolean;
   notificationStatus: 'default' | 'granted' | 'denied';
   handleNotificationToggle: (checked: boolean) => Promise<void>;
   translations: any;
-  appState: string;
+  language: 'ar' | 'en';
 }
 
 export const PrayerTimesView = ({
   prayerData,
   displayLocation,
-  isLocationModalOpen,
-  setIsLocationModalOpen,
+  onLocationSet,
   notificationsEnabled,
   notificationStatus,
   handleNotificationToggle,
   language,
   translations: t,
-  ...locationFormProps
 }: PrayerTimesViewProps) => {
   const currentTime = useCurrentTime();
 
@@ -71,7 +67,6 @@ export const PrayerTimesView = ({
   }, [prayerData, language]);
 
   const { nextPrayer, countdown } = useMemo(() => {
-    // Wait until client-side time is available to prevent hydration mismatch
     if (!prayerList.length || !currentTime) {
       return { nextPrayer: null, countdown: '00:00:00' };
     }
@@ -94,14 +89,10 @@ export const PrayerTimesView = ({
         gregorianDate={gregorianDate}
         hijriDate={hijriDate}
         displayLocation={displayLocation}
-        isLocationModalOpen={isLocationModalOpen}
-        setIsLocationModalOpen={setIsLocationModalOpen}
         changeLocationLabel={t.changeLocation}
-        locationFormProps={{
-            ...locationFormProps,
-            language: language,
-            translations: t,
-        }}
+        onLocationSet={onLocationSet}
+        language={language}
+        translations={t}
       />
 
       {nextPrayer && (

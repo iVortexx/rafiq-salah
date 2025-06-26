@@ -1,15 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useMemo, useEffect } from "react"
-import { Bell, Clock, Sun, MapPin, Loader2 } from "lucide-react"
+import { Bell, Clock, Sun, MapPin, Loader2, Save } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Header } from "@/components/prayer/Header"
 import { LocationForm } from "@/components/prayer/LocationForm"
 import { translations } from "@/lib/translations"
@@ -17,50 +15,58 @@ import { countries } from "@/lib/locations"
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from "@/components/ui/button"
+import type { Settings } from "@/types/prayer"
 
-export default function PrayerSettings() {
-  // Language and theme state
-  const [language, setLanguage] = useLocalStorage<'ar' | 'en'>('language', 'ar')
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+const defaultSettings: Settings = {
+  location: null,
+  notifications: true,
+  calculationMethod: 'mwl',
+  juristicMethod: 'standard',
+  highLatitudeAdjustment: 'none',
+  hourAdjustment: 0,
+  prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
+  language: 'ar',
+  theme: 'light',
+};
 
-  // Settings state
-  const [recommendedSettings, setRecommendedSettings] = useState(true)
-  const [manualLocation, setManualLocation] = useState(false)
-  const [notifications, setNotifications] = useState(true)
-  const [calculationMethod, setCalculationMethod] = useState("mwl")
-  const [juristicMethod, setJuristicMethod] = useState("standard")
-  const [highLatitudeAdjustment, setHighLatitudeAdjustment] = useState("none")
-  const [daylightSaving, setDaylightSaving] = useState("0")
-
-  // Location state
-  const [selectedCountry, setSelectedCountry] = useState("")
-  const [selectedCity, setSelectedCity] = useState("")
+export default function PrayerSettingsPage() {
+  const [savedSettings, setSavedSettings] = useLocalStorage<Settings>('settings', defaultSettings)
+  const [localSettings, setLocalSettings] = useState<Settings>(savedSettings)
   const [locationLoading, setLocationLoading] = useState(false)
-
-  const [prayerAdjustments, setPrayerAdjustments] = useState({
-    fajr: 0,
-    dhuhr: 0,
-    asr: 0,
-    maghrib: 0,
-    isha: 0,
-  })
-
+  
   const { toast } = useToast()
-  const [savedLocation, setSavedLocation] = useLocalStorage<{country: string, city: string} | null>('location', null)
 
-  // Get current translations
+  // When saved settings are loaded from localStorage or changed in another tab, update the local form state.
+  useEffect(() => {
+    setLocalSettings(savedSettings)
+  }, [savedSettings])
+
+  const language = localSettings.language
   const t = translations[language]
 
-  // Available cities based on selected country
-  const availableCities = useMemo(() => {
-    const country = countries.find((c) => c.name === selectedCountry || c.arabicName === selectedCountry)
-    return country ? country.cities : []
-  }, [selectedCountry])
+  const handleLanguageChange = (lang: 'ar' | 'en') => {
+    setLocalSettings(prev => ({ ...prev, language: lang }));
+  };
 
-  // Show current saved location
-  const currentLocation = savedLocation ? `${savedLocation.city}, ${savedLocation.country}` : t.noLocationSaved
+  const handleThemeChange = (theme: 'light' | 'dark') => {
+    setLocalSettings(prev => ({ ...prev, theme: theme }));
+  };
+  
+  // Handlers for form inputs to update local state
+  const handleSettingChange = (key: keyof Settings, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }))
+  }
 
-  // Use current location handler
+  const handlePrayerAdjustmentChange = (prayer: keyof Settings['prayerAdjustments'], value: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      prayerAdjustments: {
+        ...prev.prayerAdjustments,
+        [prayer]: Number.parseInt(value) || 0,
+      }
+    }))
+  }
+
   const handleUseCurrentLocation = () => {
     setLocationLoading(true)
     if ('geolocation' in navigator) {
@@ -68,20 +74,27 @@ export default function PrayerSettings() {
         async (position) => {
           try {
             const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`)
-            if (!geoResponse.ok) throw new Error('Failed to use reverse geocoding service.')
+            if (!geoResponse.ok) throw new Error(t.geolocationNotSupportedDesc)
+            
             const geoData = await geoResponse.json()
             const apiCity = geoData.city || geoData.locality
             const countryCode = geoData.countryCode
             const countryData = countries.find(c => c.code === countryCode)
+
             if (!countryData || !apiCity) throw new Error(t.manualLocationPrompt)
+            
             const matchedCityData = countryData.cities.find(c => c.name.toLowerCase() === apiCity.toLowerCase())
             if (!matchedCityData) throw new Error(`${t.cityNotMatched}: "${apiCity}". ${t.manualLocationPrompt}`)
-            const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name
-            const cityDisplayName = language === 'ar' ? matchedCityData.arabicName : matchedCityData.name
-            setSelectedCountry(countryDisplayName)
-            setSelectedCity(cityDisplayName)
-            setSavedLocation({ country: countryDisplayName, city: cityDisplayName })
-            toast({ title: t.locationSet, description: `${cityDisplayName}, ${countryDisplayName}`, variant: 'default' })
+            
+            setLocalSettings(prev => ({
+              ...prev,
+              location: {
+                country: countryData.name, // Store canonical English name
+                city: matchedCityData.name, // Store canonical English name
+              }
+            }))
+
+            toast({ title: t.locationSet, description: `${matchedCityData.name}, ${countryData.name}` })
           } catch (e: any) {
             toast({ title: t.locationAccessDenied, description: e.message, variant: 'destructive' })
           } finally {
@@ -99,25 +112,22 @@ export default function PrayerSettings() {
     }
   }
 
-  // Location handlers
-  const handleCountryChange = (countryName: string) => {
-    setSelectedCountry(countryName)
-    setSelectedCity("") // Reset city when country changes
+  const handleManualLocationSelect = (countryName: string, cityName: string) => {
+     const countryData = countries.find(c => c.name === countryName || c.arabicName === countryName);
+     const cityData = countryData?.cities.find(c => c.name === cityName || c.arabicName === cityName);
+     if (countryData && cityData) {
+       setLocalSettings(prev => ({
+         ...prev,
+         location: { country: countryData.name, city: cityData.name }
+       }))
+     }
   }
 
-  const handleCityChange = (cityName: string) => {
-    setSelectedCity(cityName)
-  }
-
-  const handleManualLocationSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setLocationLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setLocationLoading(false)
-      console.log("Location set:", { country: selectedCountry, city: selectedCity })
-    }, 1000)
-  }
+  // Save all local changes to localStorage
+  const handleSaveSettings = () => {
+    setSavedSettings(localSettings)
+    toast({ title: t.settingsSaved, description: t.settingsSavedDesc, variant: 'default' })
+  };
 
   const calculationMethods = [
     { value: "mwl", label: t.mwl },
@@ -141,107 +151,42 @@ export default function PrayerSettings() {
     { value: "anglebased", label: t.anglebased },
   ]
 
-  const daylightSavingOptions = [
-    { value: "0", label: t.noAdjustment },
-    { value: "+1", label: t.plusOneHour },
-    { value: "-1", label: t.minusOneHour },
+  const hourAdjustmentOptions = [
+    { value: 0, label: t.noAdjustment },
+    { value: 1, label: t.plusOneHour },
+    { value: -1, label: t.minusOneHour },
   ]
 
   const prayers = [
-    { key: "fajr", label: t.fajr },
-    { key: "dhuhr", label: t.dhuhr },
-    { key: "asr", label: t.asr },
-    { key: "maghrib", label: t.maghrib },
-    { key: "isha", label: t.isha },
+    { key: "fajr" as const, label: t.fajr },
+    { key: "dhuhr" as const, label: t.dhuhr },
+    { key: "asr" as const, label: t.asr },
+    { key: "maghrib" as const, label: t.maghrib },
+    { key: "isha" as const, label: t.isha },
   ]
+  
+  const currentLocation = useMemo(() => {
+    if (!localSettings.location) return t.noLocationSaved;
 
-  const handlePrayerAdjustment = (prayer: string, value: string) => {
-    setPrayerAdjustments((prev) => ({
-      ...prev,
-      [prayer]: Number.parseInt(value) || 0,
-    }))
-  }
+    const countryData = countries.find(c => c.name === localSettings.location?.country);
+    const cityData = countryData?.cities.find(c => c.name === localSettings.location?.city);
 
-  // Save all settings to localStorage
-  const [settings, setSettings] = useLocalStorage('settings', {
-    recommendedSettings,
-    notifications,
-    calculationMethod,
-    juristicMethod,
-    highLatitudeAdjustment,
-    daylightSaving,
-    prayerAdjustments,
-    language,
-    theme,
-  })
+    if (!countryData || !cityData) return t.noLocationSaved;
+    
+    return language === 'ar' 
+      ? `${cityData.arabicName}, ${countryData.arabicName}`
+      : `${cityData.name}, ${countryData.name}`;
 
-  // Remove auto-saving in each handler. Only update state, not localStorage.
-  const handleNotificationsChange = (value: boolean) => {
-    setNotifications(value);
-  };
-  const handleCalculationMethodChange = (value: string) => {
-    setCalculationMethod(value);
-  };
-  const handleJuristicMethodChange = (value: string) => {
-    setJuristicMethod(value);
-  };
-  const handleHighLatitudeAdjustmentChange = (value: string) => {
-    setHighLatitudeAdjustment(value);
-  };
-  const handleDaylightSavingChange = (value: string) => {
-    setDaylightSaving(value);
-  };
-  const handlePrayerAdjustmentChange = (prayer: string, value: string) => {
-    setPrayerAdjustments((prev) => ({
-      ...prev,
-      [prayer]: Number.parseInt(value) || 0,
-    }));
-  };
-  const handleLanguageChange = (value: 'ar' | 'en') => {
-    setLanguage(value);
-  };
-  const handleThemeChange = (value: 'light' | 'dark') => {
-    setTheme(value);
-  };
-  const handleRecommendedSettingsChange = (value: boolean) => {
-    setRecommendedSettings(value);
-    setSettings({
-      recommendedSettings: value,
-      notifications,
-      calculationMethod,
-      juristicMethod,
-      highLatitudeAdjustment,
-      daylightSaving,
-      prayerAdjustments,
-      language,
-      theme,
-    });
-  };
-
-  // Save settings handler
-  const handleSaveSettings = () => {
-    setSettings({
-      recommendedSettings,
-      notifications,
-      calculationMethod,
-      juristicMethod,
-      highLatitudeAdjustment,
-      daylightSaving,
-      prayerAdjustments,
-      language,
-      theme,
-    });
-    toast({ title: t.saveSettings, description: t.settingsSaved || 'Settings saved successfully!', variant: 'default' });
-  };
+  }, [localSettings.location, language, t]);
 
   return (
     <div className="min-h-screen bg-background">
       <Header
         title={t.prayerSettings}
         language={language}
-        setLanguage={setLanguage}
-        theme={theme}
-        setTheme={setTheme}
+        setLanguage={handleLanguageChange}
+        theme={localSettings.theme}
+        setTheme={handleThemeChange}
       />
 
       <div className="container mx-auto px-4 pb-8">
@@ -255,38 +200,18 @@ export default function PrayerSettings() {
               </CardTitle>
               <CardDescription>{t.locationSettingsDesc}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="manual-location" className="text-base font-medium">
-                    {t.useManualLocation}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">{t.useManualLocationDesc}</p>
-                  <p className="text-sm mt-2"><strong>{t.currentLocation}:</strong> {currentLocation}</p>
-                </div>
-                <Switch id="manual-location" checked={manualLocation} onCheckedChange={setManualLocation} />
-              </div>
+            <CardContent className="space-y-4">
               <Button type="button" className="w-full" onClick={handleUseCurrentLocation} disabled={locationLoading}>
                 {locationLoading ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : <MapPin className="ms-2 h-4 w-4" />}
                 {t.useCurrentLocation}
               </Button>
-
-              {manualLocation && (
-                <>
-                  <Separator />
-                  <LocationForm
-                    selectedCountry={selectedCountry}
-                    selectedCity={selectedCity}
-                    availableCities={availableCities}
-                    loading={locationLoading}
-                    handleCountryChange={handleCountryChange}
-                    handleCityChange={handleCityChange}
-                    handleManualLocationSubmit={handleManualLocationSubmit}
-                    language={language}
-                    translations={t}
-                  />
-                </>
-              )}
+               <p className="text-sm text-center"><strong>{t.currentLocation}:</strong> {currentLocation}</p>
+              <LocationForm
+                onLocationSet={handleManualLocationSelect}
+                language={language}
+                translations={t}
+                initialLocation={localSettings.location}
+              />
             </CardContent>
           </Card>
 
@@ -299,128 +224,35 @@ export default function PrayerSettings() {
               </CardTitle>
               <CardDescription>{t.calculationSettingsDesc}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="recommended" className="text-base font-medium">
-                    {t.useRecommendedSettings}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">{t.useRecommendedSettingsDesc}</p>
-                </div>
-                <Switch id="recommended" checked={recommendedSettings} onCheckedChange={handleRecommendedSettingsChange} />
-              </div>
-
-              {!recommendedSettings && (
-                <>
-                  <Separator />
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">{t.timeCalculation}</h4>
-
-                    {/* Calculation Method */}
-                    <div className="space-y-2">
-                      <Label htmlFor="calculation-method">{t.calculationMethod}</Label>
-                      <Select value={calculationMethod} onValueChange={handleCalculationMethodChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select calculation method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {calculationMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Juristic Method */}
-                    <div className="space-y-2">
-                      <Label htmlFor="juristic-method">{t.juristicMethod}</Label>
-                      <Select value={juristicMethod} onValueChange={handleJuristicMethodChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select juristic method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {juristicMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Manual Settings */}
-                    <div className="space-y-4">
-                      <h5 className="font-medium">{t.manualSettings}</h5>
-
-                      {/* High Latitude Adjustment */}
-                      <div className="space-y-2">
-                        <Label htmlFor="high-latitude">{t.highLatitudeAdjustment}</Label>
-                        <Select value={highLatitudeAdjustment} onValueChange={handleHighLatitudeAdjustmentChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select adjustment method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {highLatitudeOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Prayer Time Adjustments */}
-                      <div className="space-y-3">
-                        <Label>{t.prayerTimeAdjustments}</Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {prayers.map((prayer) => (
-                            <div key={prayer.key} className="flex items-center gap-2">
-                              <Label htmlFor={prayer.key} className="min-w-16 text-sm">
-                                {prayer.label}:
-                              </Label>
-                              <Input
-                                id={prayer.key}
-                                type="number"
-                                value={prayerAdjustments[prayer.key as keyof typeof prayerAdjustments]}
-                                onChange={(e) => handlePrayerAdjustmentChange(prayer.key, e.target.value)}
-                                className="w-20"
-                                min="-30"
-                                max="30"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Time Adjustments */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sun className="h-5 w-5 text-accent" />
-                {t.timeAdjustments}
-              </CardTitle>
-              <CardDescription>{t.timeAdjustmentsDesc}</CardDescription>
-            </CardHeader>
             <CardContent className="space-y-4">
-              {/* Daylight Saving Time */}
+              {/* Calculation Method */}
               <div className="space-y-2">
-                <Label htmlFor="daylight-saving">{t.daylightSavingTime}</Label>
-                <Select value={daylightSaving} onValueChange={handleDaylightSavingChange}>
+                <Label htmlFor="calculation-method">{t.calculationMethod}</Label>
+                <Select value={localSettings.calculationMethod} onValueChange={(v) => handleSettingChange('calculationMethod', v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select daylight saving adjustment" />
+                    <SelectValue placeholder="Select calculation method" />
                   </SelectTrigger>
                   <SelectContent>
-                    {daylightSavingOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                    {calculationMethods.map((method) => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Juristic Method */}
+              <div className="space-y-2">
+                <Label htmlFor="juristic-method">{t.juristicMethod}</Label>
+                <Select value={localSettings.juristicMethod} onValueChange={(v) => handleSettingChange('juristicMethod', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select juristic method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {juristicMethods.map((method) => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -428,6 +260,76 @@ export default function PrayerSettings() {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Advanced Calculation Settings */}
+          <Card>
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-accent" />
+                    {t.manualSettings}
+                </CardTitle>
+                <CardDescription>{t.timeAdjustmentsDesc}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {/* High Latitude Adjustment */}
+                <div className="space-y-2">
+                <Label htmlFor="high-latitude">{t.highLatitudeAdjustment}</Label>
+                <Select value={localSettings.highLatitudeAdjustment} onValueChange={(v) => handleSettingChange('highLatitudeAdjustment', v)}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select adjustment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {highLatitudeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+                </div>
+
+                {/* Hour Adjustment */}
+                <div className="space-y-2">
+                    <Label htmlFor="hour-adjustment">{t.hourAdjustment}</Label>
+                    <Select value={String(localSettings.hourAdjustment)} onValueChange={(v) => handleSettingChange('hourAdjustment', Number(v))}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select hour adjustment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {hourAdjustmentOptions.map((option) => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Prayer Time Adjustments */}
+                <div className="space-y-3">
+                <Label>{t.prayerTimeAdjustments}</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {prayers.map((prayer) => (
+                    <div key={prayer.key} className="flex items-center gap-2">
+                        <Label htmlFor={prayer.key} className="min-w-16 text-sm">
+                        {prayer.label}:
+                        </Label>
+                        <Input
+                        id={prayer.key}
+                        type="number"
+                        value={localSettings.prayerAdjustments[prayer.key as keyof typeof localSettings.prayerAdjustments]}
+                        onChange={(e) => handlePrayerAdjustmentChange(prayer.key, e.target.value)}
+                        className="w-20"
+                        min="-60"
+                        max="60"
+                        />
+                    </div>
+                    ))}
+                </div>
+                </div>
+            </CardContent>
+          </Card>
+
 
           {/* Notifications */}
           <Card>
@@ -446,14 +348,17 @@ export default function PrayerSettings() {
                   </Label>
                   <p className="text-sm text-muted-foreground">{t.enableNotificationsDesc}</p>
                 </div>
-                <Switch id="notifications" checked={notifications} onCheckedChange={handleNotificationsChange} />
+                <Switch id="notifications" checked={localSettings.notifications} onCheckedChange={(v) => handleSettingChange('notifications', v)} />
               </div>
             </CardContent>
           </Card>
 
           {/* Save Button */}
           <div className="flex justify-center pt-4">
-            <Button className="w-full mt-6" onClick={handleSaveSettings}>{t.saveSettings}</Button>
+            <Button className="w-full mt-6" onClick={handleSaveSettings}>
+                <Save />
+                {t.saveSettings}
+            </Button>
           </div>
         </div>
       </div>

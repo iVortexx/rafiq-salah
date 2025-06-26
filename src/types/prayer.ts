@@ -94,3 +94,16 @@ export interface AladhanResponse {
   status: string;
   data: PrayerData;
 }
+
+// App-wide settings type
+export type Settings = {
+  location: { country: string; city: string } | null;
+  notifications: boolean;
+  calculationMethod: 'mwl' | 'isna' | 'egypt' | 'makkah' | 'karachi' | 'tehran' | 'jafari';
+  juristicMethod: 'standard' | 'hanafi';
+  highLatitudeAdjustment: 'none' | 'midnight' | 'oneseventh' | 'anglebased';
+  hourAdjustment: 0 | 1 | -1;
+  prayerAdjustments: { fajr: number; dhuhr: number; asr: number; maghrib: number; isha: number };
+  language: 'ar' | 'en';
+  theme: 'light' | 'dark';
+};

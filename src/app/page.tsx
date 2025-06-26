@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePrayerTimes } from '@/hooks/usePrayerTimes';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -10,152 +10,147 @@ import { LoadingState } from '@/components/prayer/LoadingState';
 import { GeoFallbackState } from '@/components/prayer/GeoFallbackState';
 import { PrayerTimesView } from '@/components/prayer/PrayerTimesView';
 import { translations } from '@/lib/translations';
+import type { Settings } from '@/types/prayer';
+import { countries } from '@/lib/locations';
+import { useToast } from '@/hooks/use-toast';
 
-type SettingsType = {
-  recommendedSettings: boolean;
-  notifications: boolean;
-  calculationMethod: 'mwl' | 'isna' | 'egypt' | 'makkah' | 'karachi' | 'tehran' | 'jafari';
-  juristicMethod: 'standard' | 'hanafi';
-  highLatitudeAdjustment: 'none' | 'midnight' | 'oneseventh' | 'anglebased';
-  daylightSaving: '0' | '+1' | '-1';
-  prayerAdjustments: { fajr: number; dhuhr: number; asr: number; maghrib: number; isha: number };
-  language: 'ar' | 'en';
-  theme: 'light' | 'dark';
+
+const defaultSettings: Settings = {
+  location: null,
+  notifications: true,
+  calculationMethod: 'mwl',
+  juristicMethod: 'standard',
+  highLatitudeAdjustment: 'none',
+  hourAdjustment: 0,
+  prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
+  language: 'ar',
+  theme: 'light',
 };
 
+
 export default function Home() {
-  const [language, setLanguage] = useLocalStorage<'ar' | 'en'>('language', 'ar');
+  const [settings, setSettings, settingsHydrated] = useLocalStorage<Settings>('settings', defaultSettings);
+  const { toast } = useToast();
+
+  const language = settings.language;
   const t = useMemo(() => translations[language], [language]);
-
-  const [settings, setSettings] = useLocalStorage<SettingsType>('settings', {
-    recommendedSettings: true,
-    notifications: true,
-    calculationMethod: 'mwl',
-    juristicMethod: 'standard',
-    highLatitudeAdjustment: 'none',
-    daylightSaving: '0',
-    prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
-    language: language,
-    theme: 'light',
-  });
-
-  // If recommendedSettings is true, use only recommended/default settings for calculation
-  const calculationSettings = settings.recommendedSettings
-    ? {
-        calculationMethod: 'mwl',
-        juristicMethod: 'standard',
-        highLatitudeAdjustment: 'none',
-        daylightSaving: '0',
-        prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
-      }
-    : settings;
 
   const {
     appState,
     prayerData,
     error,
-    selectedCountry,
-    selectedCity,
-    availableCities,
     displayLocation,
-    isLocationModalOpen,
-    setIsLocationModalOpen,
-    handleCountryChange,
-    handleCityChange,
-    handleManualLocationSubmit,
-    retryGeolocation,
-  } = usePrayerTimes(language, t, calculationSettings);
+    fetchPrayerTimesByCity,
+    fetchPrayerTimesFromCoords,
+    setAppState,
+    setError,
+  } = usePrayerTimes(settings, language, t);
 
   const {
     notificationsEnabled,
     notificationStatus,
-    handleNotificationToggle,
+    handleNotificationToggle: hookHandleNotificationToggle,
   } = useNotifications(t);
 
-  const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('theme', 'light');
 
-  const locationFormProps = {
-    selectedCountry,
-    selectedCity,
-    availableCities,
-    loading: appState === 'loading',
-    handleCountryChange,
-    handleCityChange,
-    handleManualLocationSubmit,
-    language,
-    // translations prop is passed inside GeoFallbackState and PrayerTimesView directly
+  useEffect(() => {
+    if (!settingsHydrated) return; // Wait for settings to load from localStorage
+
+    if (settings.location?.city && settings.location?.country) {
+      fetchPrayerTimesByCity(settings.location.city, settings.location.country);
+    } else {
+      // First time user or no location saved, try geolocation
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude)
+              .then(location => {
+                if (location) {
+                  // Geolocation was successful, save the new location
+                  setSettings(prev => ({...prev, location: { country: location.country, city: location.city }}));
+                  toast({ title: t.locationSet, description: `${location.city}, ${location.country}`});
+                }
+              });
+          },
+          (err) => {
+            setError(t.locationAccessDeniedDesc);
+            toast({ title: t.locationAccessDenied, description: err.message, variant: "destructive" });
+            setAppState('geo-fallback');
+          }
+        );
+      } else {
+        setError(t.geolocationNotSupportedDesc);
+        toast({ title: t.geolocationNotSupported, description: t.geolocationNotSupportedDesc, variant: "destructive" });
+        setAppState('geo-fallback');
+      }
+    }
+  }, [settingsHydrated]); // Run only once when settings are loaded
+
+  const handleManualLocationSelect = (countryName: string, cityName: string) => {
+    const countryData = countries.find(c => c.name === countryName || c.arabicName === countryName);
+    const cityData = countryData?.cities.find(c => c.name === cityName || c.arabicName === cityName);
+
+    if (countryData && cityData) {
+      setSettings(prev => ({
+        ...prev,
+        location: {
+          country: countryData.name, // Save canonical English name
+          city: cityData.name,      // Save canonical English name
+        }
+      }));
+      fetchPrayerTimesByCity(cityData.name, countryData.name);
+    }
   };
 
-  // Notification toggle handler for home page
+  const retryGeolocation = () => {
+    setAppState('loading');
+    setError(null);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude)
+            .then(location => {
+              if (location) {
+                setSettings(prev => ({...prev, location: { country: location.country, city: location.city }}));
+                toast({ title: t.locationSet, description: `${location.city}, ${location.country}`});
+              }
+            });
+        },
+        () => {
+          setError(t.locationAccessDeniedDesc);
+          toast({ title: t.locationAccessDenied, description: t.locationAccessDeniedDesc, variant: "destructive" });
+          setAppState('geo-fallback');
+        }
+      );
+    } else {
+      setError(t.geolocationNotSupportedDesc);
+      toast({ title: t.geolocationNotSupported, description: t.geolocationNotSupportedDesc, variant: "destructive" });
+      setAppState('geo-fallback');
+    }
+  };
+
   const handleNotificationToggleHome = async (checked: boolean): Promise<void> => {
     setSettings({ ...settings, notifications: checked });
-    await handleNotificationToggle(checked);
+    await hookHandleNotificationToggle(checked);
   };
+  
+  const handleLanguageChange = (lang: 'ar' | 'en') => {
+    setSettings(prev => ({...prev, language: lang}));
+  }
 
-  const prayerTimesViewProps = {
-    prayerData: prayerData!,
-    displayLocation,
-    isLocationModalOpen,
-    setIsLocationModalOpen,
-    notificationsEnabled: settings.notifications,
-    notificationStatus,
-    handleNotificationToggle: handleNotificationToggleHome,
-    translations: t,
-    ...locationFormProps,
-    appState: appState,
-  };
+  const handleThemeChange = (theme: 'light' | 'dark') => {
+    setSettings(prev => ({...prev, theme: theme}));
+  }
 
-  // Display current settings at the top of the home page
-  const calculationMethodLabels: Record<string, string> = {
-    mwl: t.mwl,
-    isna: t.isna,
-    egypt: t.egypt,
-    makkah: t.makkah,
-    karachi: t.karachi,
-    tehran: t.tehran,
-    jafari: t.jafari,
-  };
-  const juristicMethodLabels: Record<string, string> = {
-    standard: t.standard,
-    hanafi: t.hanafi,
-  };
-  const highLatitudeLabels: Record<string, string> = {
-    none: t.none,
-    midnight: t.midnight,
-    oneseventh: t.oneseventh,
-    anglebased: t.anglebased,
-  };
-  const daylightSavingLabels: Record<string, string> = {
-    '0': t.noAdjustment,
-    '+1': t.plusOneHour,
-    '-1': t.minusOneHour,
-  };
-  const calculationMethodLabel: string = calculationMethodLabels[settings.calculationMethod] || settings.calculationMethod;
-  const juristicMethodLabel: string = juristicMethodLabels[settings.juristicMethod] || settings.juristicMethod;
-  const highLatitudeLabel: string = highLatitudeLabels[settings.highLatitudeAdjustment] || settings.highLatitudeAdjustment;
-  const daylightSavingLabel: string = daylightSavingLabels[settings.daylightSaving] || settings.daylightSaving;
-  const notificationsLabel: string = settings.notifications ? t.notificationEnabled : t.notificationDisabled;
-  const settingsSummary = (
-    <div className="my-6 p-4 rounded bg-muted text-muted-foreground">
-      <h2 className="font-bold mb-2">{t.prayerSettings}</h2>
-      <div className="flex flex-wrap gap-4 text-sm">
-        <div><b>{t.calculationMethod}:</b> {calculationMethodLabel}</div>
-        <div><b>{t.juristicMethod}:</b> {juristicMethodLabel}</div>
-        <div><b>{t.highLatitudeAdjustment}:</b> {highLatitudeLabel}</div>
-        <div><b>{t.daylightSavingTime}:</b> {daylightSavingLabel}</div>
-        <div><b>{t.notifications}:</b> {notificationsLabel}</div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Header
         title={t.title}
-        language={language}
-        setLanguage={setLanguage}
-        theme={theme}
-        setTheme={setTheme}
+        language={settings.language}
+        setLanguage={handleLanguageChange}
+        theme={settings.theme}
+        setTheme={handleThemeChange}
       />
       <main className="container mx-auto px-4 pb-8">
         {appState === 'loading' && <LoadingState />}
@@ -164,16 +159,23 @@ export default function Home() {
           <GeoFallbackState
             error={error}
             translations={t}
-            locationFormProps={locationFormProps}
+            onLocationSet={handleManualLocationSelect}
             retryGeolocation={retryGeolocation}
+            language={language}
           />
         )}
 
         {appState === 'ready' && prayerData && (
-          <>
-            <PrayerTimesView {...prayerTimesViewProps} />
-            {settingsSummary}
-          </>
+          <PrayerTimesView 
+            prayerData={prayerData}
+            displayLocation={displayLocation}
+            onLocationSet={handleManualLocationSelect}
+            notificationsEnabled={settings.notifications}
+            notificationStatus={notificationStatus}
+            handleNotificationToggle={handleNotificationToggleHome}
+            translations={t}
+            language={language}
+          />
         )}
       </main>
       <footer className="text-center py-6 border-t mt-8">

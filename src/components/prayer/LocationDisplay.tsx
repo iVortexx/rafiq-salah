@@ -1,7 +1,7 @@
 
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MapPin, Pencil } from 'lucide-react';
@@ -12,21 +12,28 @@ interface LocationDisplayProps {
   gregorianDate: string;
   hijriDate: string;
   displayLocation: string;
-  isLocationModalOpen: boolean;
-  setIsLocationModalOpen: (isOpen: boolean) => void;
   changeLocationLabel: string;
-  locationFormProps: LocationFormProps;
+  onLocationSet: (country: string, city: string) => void;
+  language: 'ar' | 'en';
+  translations: any;
 }
 
 export const LocationDisplay = memo(({
   gregorianDate,
   hijriDate,
   displayLocation,
-  isLocationModalOpen,
-  setIsLocationModalOpen,
   changeLocationLabel,
-  locationFormProps
+  onLocationSet,
+  language,
+  translations
 }: LocationDisplayProps) => {
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  const handleLocationSubmit = (country: string, city: string) => {
+    onLocationSet(country, city);
+    setIsLocationModalOpen(false);
+  }
+
   return (
     <section className="text-center mb-8">
       <p className="text-lg text-muted-foreground">{gregorianDate}</p>
@@ -46,7 +53,12 @@ export const LocationDisplay = memo(({
               <DialogTitle>{changeLocationLabel}</DialogTitle>
             </DialogHeader>
             <div className="pt-4">
-              <LocationForm {...locationFormProps} />
+              <LocationForm 
+                onLocationSet={handleLocationSubmit}
+                language={language}
+                translations={translations}
+                showSubmitButton={true}
+              />
             </div>
           </DialogContent>
         </Dialog>
