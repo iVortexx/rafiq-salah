@@ -99,7 +99,7 @@ export interface AladhanResponse {
 export type Settings = {
   location: { country: string; city: string } | null;
   notifications: boolean;
-  calculationMethod: 'mwl' | 'isna' | 'egypt' | 'makkah' | 'karachi' | 'tehran' | 'jafari';
+  calculationMethod: 'default' | 'mwl' | 'isna' | 'egypt' | 'makkah' | 'karachi' | 'tehran' | 'jafari';
   juristicMethod: 'standard' | 'hanafi';
   highLatitudeAdjustment: 'none' | 'midnight' | 'oneseventh' | 'anglebased';
   hourAdjustment: 0 | 1 | -1;

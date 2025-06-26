@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Bell, Clock, Sun, MapPin, Loader2, Save } from "lucide-react"
+import { Bell, Clock, Sun, MapPin, Loader2, Save, RotateCcw } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -20,7 +20,7 @@ import type { Settings } from "@/types/prayer"
 const defaultSettings: Settings = {
   location: null,
   notifications: true,
-  calculationMethod: 'mwl',
+  calculationMethod: 'default',
   juristicMethod: 'standard',
   highLatitudeAdjustment: 'none',
   hourAdjustment: 0,
@@ -129,7 +129,16 @@ export default function PrayerSettingsPage() {
     toast({ title: t.settingsSaved, description: t.settingsSavedDesc, variant: 'default' })
   };
 
+  const handleRestoreDefaults = () => {
+    setLocalSettings(defaultSettings);
+    toast({
+        title: t.settingsRestored,
+        description: t.settingsRestoredDesc
+    });
+  };
+
   const calculationMethods = [
+    { value: "default", label: t.defaultForCountry },
     { value: "mwl", label: t.mwl },
     { value: "isna", label: t.isna },
     { value: "egypt", label: t.egypt },
@@ -354,8 +363,12 @@ export default function PrayerSettingsPage() {
           </Card>
 
           {/* Save Button */}
-          <div className="flex justify-center pt-4">
-            <Button className="w-full mt-6" onClick={handleSaveSettings}>
+          <div className="flex flex-col-reverse sm:flex-row justify-center items-center gap-4 pt-4">
+            <Button type="button" variant="outline" className="w-full" onClick={handleRestoreDefaults}>
+              <RotateCcw />
+              {t.restoreDefaults}
+            </Button>
+            <Button className="w-full" onClick={handleSaveSettings}>
                 <Save />
                 {t.saveSettings}
             </Button>

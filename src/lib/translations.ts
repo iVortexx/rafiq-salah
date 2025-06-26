@@ -53,7 +53,7 @@ export const translations = {
     locationSettings: "إعدادات الموقع",
     locationSettingsDesc: "استخدم الكشف التلقائي أو حدد موقعك يدويًا للحصول على أوقات صلاة دقيقة.",
     timeAdjustments: "تعديلات الوقت والتنسيق",
-    timeAdjustmentsDesc: "قم بتعديل إزاحة الساعات يدويًا لمراعاة التوقيت الصيفي أو فروق المناطق الزمنية.",
+    timeAdjustmentsDesc: "قم بتعديل إزاحة الساعات يدويًا لمراعاة فروق المناطق الزمنية.",
     notifications: "الإشعارات",
     notificationsDesc: "إدارة إشعارات وتنبيهات أوقات الصلاة",
     enableNotificationsDesc: "تلقي تنبيهات لأوقات الصلاة",
@@ -76,6 +76,7 @@ export const translations = {
     isha: "العشاء",
 
     // Calculation methods
+    defaultForCountry: "الافتراضي للدولة",
     mwl: "رابطة العالم الإسلامي",
     isna: "الجمعية الإسلامية لأمريكا الشمالية",
     egypt: "الهيئة المصرية العامة للمساحة",
@@ -114,6 +115,9 @@ export const translations = {
     currentLocation: "الموقع المحدد حاليًا",
     useCurrentLocation: "استخدم موقعي الحالي",
     retryGeolocation: "إعادة المحاولة باستخدام الموقع الحالي",
+    restoreDefaults: "استعادة الإعدادات الافتراضية",
+    settingsRestored: "تمت استعادة الإعدادات",
+    settingsRestoredDesc: "تمت إعادة تعيين إعداداتك إلى قيمها الافتراضية.",
   },
   en: {
     // Existing translations
@@ -169,7 +173,7 @@ export const translations = {
     locationSettings: "Location Settings",
     locationSettingsDesc: "Use automatic detection or manually set your location for accurate prayer times.",
     timeAdjustments: "Time & Format Settings",
-    timeAdjustmentsDesc: "Manually adjust hour offsets for DST or timezone differences.",
+    timeAdjustmentsDesc: "Manually adjust hour offsets for timezone differences.",
     notifications: "Notifications",
     notificationsDesc: "Manage prayer time notifications and alerts",
     enableNotificationsDesc: "Receive alerts for prayer times",
@@ -192,6 +196,7 @@ export const translations = {
     isha: "Isha",
 
     // Calculation methods
+    defaultForCountry: "Default for Country",
     mwl: "Muslim World League",
     isna: "Islamic Society of North America",
     egypt: "Egyptian General Authority of Survey",
@@ -230,5 +235,8 @@ export const translations = {
     currentLocation: "Currently Selected Location",
     useCurrentLocation: "Use My Current Location",
     retryGeolocation: "Retry using current location",
+    restoreDefaults: "Restore Default Settings",
+    settingsRestored: "Settings Restored",
+    settingsRestoredDesc: "Your settings have been reset to their default values.",
   },
 }
