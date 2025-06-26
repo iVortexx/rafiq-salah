@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -6,10 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import type { AladhanResponse, PrayerData } from '@/types/prayer';
 import type { City } from '@/lib/locations';
 import { countries } from '@/lib/locations';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 
 type AppState = 'loading' | 'ready' | 'error' | 'geo-fallback';
 
-export function usePrayerTimes(language: 'ar' | 'en', t: any) {
+export function usePrayerTimes(language: 'ar' | 'en', t: any, settings?: any) {
   const [appState, setAppState] = useState<AppState>('loading');
   const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,25 +23,68 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
 
   const { toast } = useToast();
   const geoAttempted = useRef(false);
+  const [savedLocation, setSavedLocation, hydrated] = useLocalStorage<{country: string, city: string} | null>('location', null);
+
+  // Map calculation method string to Aladhan API method number
+  const methodMap: Record<string, number> = {
+    mwl: 3, // Muslim World League
+    isna: 2, // Islamic Society of North America
+    egypt: 5, // Egyptian General Authority of Survey
+    makkah: 4, // Umm Al-Qura University, Makkah
+    karachi: 1, // University of Islamic Sciences, Karachi
+    tehran: 7, // Institute of Geophysics, University of Tehran
+    jafari: 8, // Shia Ithna-Ashari, Leva Institute, Qum
+  };
+
+  // Helper to get canonical (English) names
+  function getCanonicalCountryName(name: string): string {
+    const country = countries.find(c => c.name === name || c.arabicName === name);
+    return country ? country.name : name;
+  }
+  function getCanonicalCityName(countryName: string, cityName: string): string {
+    const country = countries.find(c => c.name === countryName || c.arabicName === countryName);
+    if (!country) return cityName;
+    const city = country.cities.find(c => c.name === cityName || c.arabicName === cityName);
+    return city ? city.name : cityName;
+  }
 
   const fetchPrayerTimesByCity = useCallback(async (cityIdentifier: string, countryIdentifier: string) => {
     setAppState('loading');
     setError(null);
   
     try {
-      const countryData = countries.find(c => c.name === countryIdentifier || c.arabicName === countryIdentifier);
+      // Always use canonical (English) names for lookup
+      const canonicalCountry = getCanonicalCountryName(countryIdentifier);
+      const canonicalCity = getCanonicalCityName(canonicalCountry, cityIdentifier);
+      const countryData = countries.find(c => c.name === canonicalCountry);
       if (!countryData) throw new Error("Invalid country selected.");
   
-      const cityData = countryData.cities.find(c => c.name === cityIdentifier || c.arabicName === cityIdentifier);
+      const cityData = countryData.cities.find(c => c.name === canonicalCity);
       if (!cityData) throw new Error("Invalid city selected.");
-      
-      const method = countryData.method;
+      // Use settings for method, juristic, high latitude, daylight saving, and prayer adjustments
+      let method = countryData.method;
+      if (settings?.calculationMethod && methodMap[settings.calculationMethod]) {
+        method = methodMap[settings.calculationMethod];
+      }
+      const school = settings?.juristicMethod === 'hanafi' ? 1 : 0;
+      let latitudeAdjustmentMethod = 'NONE';
+      if (settings?.highLatitudeAdjustment === 'midnight') latitudeAdjustmentMethod = 'MIDNIGHT';
+      else if (settings?.highLatitudeAdjustment === 'oneseventh') latitudeAdjustmentMethod = 'ONE_SEVENTH';
+      else if (settings?.highLatitudeAdjustment === 'anglebased') latitudeAdjustmentMethod = 'ANGLE_BASED';
+      const dst = settings?.daylightSaving === '+1' ? 1 : settings?.daylightSaving === '-1' ? -1 : 0;
+      // Prayer adjustments: order is Imsak,Fajr,Sunrise,Dhuhr,Asr,Maghrib,Sunset,Isha,Midnight
+      // We'll only adjust Fajr, Dhuhr, Asr, Maghrib, Isha, rest 0
+      const pa = settings?.prayerAdjustments || {};
+      const tune = [0, pa.fajr || 0, 0, pa.dhuhr || 0, pa.asr || 0, pa.maghrib || 0, 0, pa.isha || 0, 0].join(',');
       const today = new Date();
       const dateString = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
   
       // The API needs the Arabic city and country name to function correctly
-      const url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${cityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
-  
+      let url = `https://api.aladhan.com/v1/timingsByCity/${dateString}?city=${cityData.arabicName}&country=${countryData.arabicName}&method=${method}`;
+      url += `&school=${school}`;
+      url += `&latitudeAdjustmentMethod=${latitudeAdjustmentMethod}`;
+      url += `&dst=${dst}`;
+      url += `&tune=${tune}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch prayer times. Please check your internet connection.');
       const data: AladhanResponse = await response.json();
@@ -49,13 +92,15 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
       
       setPrayerData(data.data);
       
+      // For display, use display names
       const countryDisplayName = language === 'ar' ? countryData.arabicName : countryData.name;
       const cityDisplayName = language === 'ar' ? cityData.arabicName : cityData.name;
-      
       setDisplayLocation(`${cityDisplayName}, ${countryDisplayName}`);
       setSelectedCountry(countryDisplayName);
       setSelectedCity(cityDisplayName);
       setAvailableCities(countryData.cities);
+      // Save canonical names to localStorage
+      setSavedLocation({ country: canonicalCountry, city: canonicalCity });
       setAppState('ready');
       setIsLocationModalOpen(false);
   
@@ -64,7 +109,7 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
       setAppState('geo-fallback');
       toast({ variant: "destructive", title: t.notificationError, description: e.message });
     }
-  }, [toast, language, t.notificationError]);
+  }, [toast, language, t.notificationError, settings]);
 
   const fetchPrayerTimesFromCoords = useCallback(async (latitude: number, longitude: number) => {
     setAppState('loading');
@@ -115,11 +160,47 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
   }, [toast, t, fetchPrayerTimesByCity, language]);
   
   useEffect(() => {
-    if (geoAttempted.current) {
-      return;
-    }
+    if (!hydrated) return; // Wait for localStorage to be loaded
+    if (geoAttempted.current) return;
     geoAttempted.current = true;
-
+    (async () => {
+      if (savedLocation && savedLocation.country && savedLocation.city) {
+        const canonicalCountry = getCanonicalCountryName(savedLocation.country);
+        const canonicalCity = getCanonicalCityName(canonicalCountry, savedLocation.city);
+        try {
+          await fetchPrayerTimesByCity(canonicalCity, canonicalCountry);
+          return; // Only proceed to geolocation if this fails
+        } catch (e) {
+          setSavedLocation(null);
+          toast({
+            variant: 'destructive',
+            title: t.manualLocationPrompt,
+            description: t.locationAccessDeniedDesc || 'Please reselect your location.',
+          });
+        }
+      }
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            fetchPrayerTimesFromCoords(position.coords.latitude, position.coords.longitude);
+          },
+          () => {
+            setError(t.locationAccessDeniedDesc);
+            toast({ title: t.locationAccessDenied, description: t.locationAccessDeniedDesc, variant: "destructive" });
+            setAppState('geo-fallback');
+          }
+        );
+      } else {
+        setError(t.geolocationNotSupportedDesc);
+        toast({ title: t.geolocationNotSupported, description: t.geolocationNotSupportedDesc, variant: "destructive" });
+        setAppState('geo-fallback');
+      }
+    })();
+  }, [hydrated, fetchPrayerTimesFromCoords, toast, t, savedLocation, fetchPrayerTimesByCity]);
+  
+  const retryGeolocation = useCallback(() => {
+    setAppState('loading');
+    setError(null);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -145,16 +226,28 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
       setSelectedCountry(countryDisplayName);
       setAvailableCities(countryData.cities);
       setSelectedCity('');
+      // If city is set, update localStorage with canonical names
+      if (countryData.name && selectedCity) {
+        const canonicalCity = getCanonicalCityName(countryData.name, selectedCity);
+        setSavedLocation({ country: countryData.name, city: canonicalCity });
+      }
     }
-  }, [language]);
+  }, [language, selectedCity, setSavedLocation]);
   
   const handleCityChange = useCallback((cityIdentifier: string) => {
-    const cityData = availableCities.find(c => c.name === cityIdentifier || c.arabicName === cityIdentifier);
-    if (cityData) {
+    const countryData = countries.find(c => c.name === getCanonicalCountryName(selectedCountry) || c.arabicName === selectedCountry);
+    if (countryData) {
+      const cityData = countryData.cities.find(c => c.name === cityIdentifier || c.arabicName === cityIdentifier);
+      if (cityData) {
         const cityDisplayName = language === 'ar' ? cityData.arabicName : cityData.name;
         setSelectedCity(cityDisplayName);
+        // If country is set, update localStorage with canonical names
+        if (selectedCountry && cityData.name) {
+          setSavedLocation({ country: countryData.name, city: cityData.name });
+        }
+      }
     }
-  }, [availableCities, language]);
+  }, [availableCities, language, selectedCountry, setSavedLocation]);
 
   const handleManualLocationSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -177,5 +270,6 @@ export function usePrayerTimes(language: 'ar' | 'en', t: any) {
     handleCountryChange,
     handleCityChange,
     handleManualLocationSubmit,
+    retryGeolocation,
   };
 }

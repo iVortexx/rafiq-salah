@@ -1,6 +1,6 @@
-
 export const translations = {
   ar: {
+    // Existing translations
     title: "رفيق الصلاة",
     loadingLocation: "جاري تحديد موقعك...",
     welcome: "أهلاً بك في رفيق الصلاة",
@@ -44,17 +44,82 @@ export const translations = {
     geolocationNotSupported: "تحديد الموقع غير مدعوم",
     geolocationNotSupportedDesc: "متصفحك لا يدعم هذه الميزة. يرجى تحديد موقعك يدويًا.",
     cityNotMatched: "لم نتمكن من مطابقة مدينتك",
+
+    // Settings page translations
+    prayerSettings: "إعدادات الصلاة",
+    calculationSettings: "إعدادات الحساب",
+    calculationSettingsDesc: "اختر بين الإعدادات الموصى بها أو قم بتخصيص حسابات أوقات الصلاة",
+    locationSettings: "إعدادات الموقع",
+    locationSettingsDesc: "حدد موقعك للحصول على أوقات صلاة دقيقة",
+    timeAdjustments: "تعديلات الوقت",
+    timeAdjustmentsDesc: "قم بتكوين التوقيت الصيفي وإعدادات أخرى متعلقة بالوقت",
+    notifications: "الإشعارات",
+    notificationsDesc: "إدارة إشعارات وتنبيهات أوقات الصلاة",
+    useRecommendedSettings: "استخدام الإعدادات الموصى بها",
+    useRecommendedSettingsDesc: "تكوين أوقات الصلاة تلقائياً بناءً على موقعك",
+    useManualLocation: "استخدام الموقع اليدوي",
+    useManualLocationDesc: "اختر بلدك ومدينتك يدوياً لأوقات الصلاة",
+    enableNotificationsDesc: "تلقي تنبيهات لأوقات الصلاة",
+    timeCalculation: "حساب الوقت",
+    calculationMethod: "طريقة الحساب",
+    juristicMethod: "المذهب الفقهي",
+    manualSettings: "الإعدادات اليدوية",
+    highLatitudeAdjustment: "تعديل خطوط العرض العالية",
+    prayerTimeAdjustments: "تعديلات أوقات الصلاة (بالدقائق)",
+    daylightSavingTime: "التوقيت الصيفي",
+    saveSettings: "حفظ الإعدادات",
+    settingsSaved: "تم حفظ الإعدادات بنجاح!",
+
+    // Prayer names
+    fajr: "الفجر",
+    dhuhr: "الظهر",
+    asr: "العصر",
+    maghrib: "المغرب",
+    isha: "العشاء",
+
+    // Calculation methods
+    mwl: "رابطة العالم الإسلامي",
+    isna: "الجمعية الإسلامية لأمريكا الشمالية",
+    egypt: "الهيئة المصرية العامة للمساحة",
+    makkah: "جامعة أم القرى، مكة المكرمة",
+    karachi: "جامعة العلوم الإسلامية، كراتشي",
+    tehran: "معهد الجيوفيزياء، جامعة طهران",
+    jafari: "الشيعة الإثنا عشرية، معهد لوا، قم",
+
+    // Juristic methods
+    standard: "المعيار (الحنفي، المالكي، الشافعي، الحنبلي)",
+    hanafi: "الحنفي",
+
+    // High latitude options
+    none: "لا شيء",
+    midnight: "منتصف الليل",
+    oneseventh: "السُبع",
+    anglebased: "على أساس الزاوية",
+
+    // Daylight saving options
+    noAdjustment: "بدون تعديل (0)",
+    plusOneHour: "+1 ساعة",
+    minusOneHour: "-1 ساعة",
+
     methodNames: {
       "Muslim World League": "رابطة العالم الإسلامي",
       "Egyptian General Authority of Survey": "الهيئة المصرية العامة للمساحة",
       "Umm Al-Qura University, Makkah": "جامعة أم القرى، مكة المكرمة",
       "Institute of Geophysics, University of Tehran": "معهد الجيوفيزياء، جامعة طهران",
       "Gulf Region": "دول الخليج (دبي)",
-      "Kuwait": "الكويت",
-      "Qatar": "قطر",
+      Kuwait: "الكويت",
+      Qatar: "قطر",
     },
+
+    // --- Add below in ar ---
+    noLocationSaved: "لم يتم حفظ موقع بعد",
+    locationSet: "تم تعيين الموقع",
+    currentLocation: "الموقع الحالي",
+    useCurrentLocation: "استخدم موقعي الحالي",
+    retryGeolocation: "إعادة المحاولة باستخدام الموقع الحالي",
   },
   en: {
+    // Existing translations
     title: "Prayer Pal",
     loadingLocation: "Determining your location...",
     welcome: "Welcome to Prayer Pal",
@@ -98,14 +163,78 @@ export const translations = {
     geolocationNotSupported: "Geolocation Not Supported",
     geolocationNotSupportedDesc: "Your browser does not support this feature. Please select your location manually.",
     cityNotMatched: "Could not match your city",
+
+    // Settings page translations
+    prayerSettings: "Prayer Settings",
+    calculationSettings: "Calculation Settings",
+    calculationSettingsDesc: "Choose between recommended settings or customize your prayer time calculations",
+    locationSettings: "Location Settings",
+    locationSettingsDesc: "Set your location for accurate prayer times",
+    timeAdjustments: "Time Adjustments",
+    timeAdjustmentsDesc: "Configure daylight saving time and other time-related settings",
+    notifications: "Notifications",
+    notificationsDesc: "Manage prayer time notifications and alerts",
+    useRecommendedSettings: "Use Recommended Settings",
+    useRecommendedSettingsDesc: "Automatically configure prayer times based on your location",
+    useManualLocation: "Use Manual Location",
+    useManualLocationDesc: "Manually select your country and city for prayer times",
+    enableNotificationsDesc: "Receive alerts for prayer times",
+    timeCalculation: "Time Calculation",
+    calculationMethod: "Calculation Method",
+    juristicMethod: "Juristic Method",
+    manualSettings: "Manual Settings",
+    highLatitudeAdjustment: "High Latitude Adjustment",
+    prayerTimeAdjustments: "Prayer Time Adjustments (minutes)",
+    daylightSavingTime: "Daylight Saving Time",
+    saveSettings: "Save Settings",
+    settingsSaved: "Settings saved successfully!",
+
+    // Prayer names
+    fajr: "Fajr",
+    dhuhr: "Dhuhr",
+    asr: "Asr",
+    maghrib: "Maghrib",
+    isha: "Isha",
+
+    // Calculation methods
+    mwl: "Muslim World League",
+    isna: "Islamic Society of North America",
+    egypt: "Egyptian General Authority of Survey",
+    makkah: "Umm Al-Qura University, Makkah",
+    karachi: "University of Islamic Sciences, Karachi",
+    tehran: "Institute of Geophysics, University of Tehran",
+    jafari: "Shia Ithna-Ashari, Leva Institute, Qum",
+
+    // Juristic methods
+    standard: "Standard (Hanafi, Maliki, Shafi'i, Hanbali)",
+    hanafi: "Hanafi",
+
+    // High latitude options
+    none: "None",
+    midnight: "Middle of Night",
+    oneseventh: "One Seventh",
+    anglebased: "Angle Based",
+
+    // Daylight saving options
+    noAdjustment: "No Adjustment (0)",
+    plusOneHour: "+1 Hour",
+    minusOneHour: "-1 Hour",
+
     methodNames: {
       "Muslim World League": "Muslim World League",
       "Egyptian General Authority of Survey": "Egyptian General Authority of Survey",
       "Umm Al-Qura University, Makkah": "Umm Al-Qura University, Makkah",
       "Institute of Geophysics, University of Tehran": "Institute of Geophysics, University of Tehran",
       "Gulf Region": "Gulf Region",
-      "Kuwait": "Kuwait",
-      "Qatar": "Qatar",
+      Kuwait: "Kuwait",
+      Qatar: "Qatar",
     },
-  }
-};
+
+    // --- Add below in en ---
+    noLocationSaved: "No location saved yet",
+    locationSet: "Location set",
+    currentLocation: "Current Location",
+    useCurrentLocation: "Use Current Location",
+    retryGeolocation: "Retry using current location",
+  },
+}

@@ -1,12 +1,12 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 
-export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
+export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void, boolean] {
   // Initialize with the initialValue to ensure the first render on the client
   // matches the server-rendered output, preventing hydration errors.
   const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [hydrated, setHydrated] = useState(false);
 
   // This effect runs only on the client, after the component has mounted.
   // It safely reads the value from localStorage and updates the state.
@@ -21,6 +21,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
       // If parsing fails, we keep the initialValue.
       // We don't log an error to avoid the Next.js error overlay in dev.
     }
+    setHydrated(true);
   }, [key]);
 
 
@@ -53,5 +54,5 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [key, initialValue]);
 
-  return [storedValue, setValue];
+  return [storedValue, setValue, hydrated];
 }
