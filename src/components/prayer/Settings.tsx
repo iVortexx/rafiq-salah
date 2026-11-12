@@ -1,52 +1,50 @@
-
 'use client';
 
 import { memo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Bell } from 'lucide-react';
+import { Bell, Chrome, ExternalLink } from 'lucide-react';
 import type { PrayerData } from '@/types/prayer';
+
+const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/afcbeklnhcpfeokpdjgmlnlnemejajgc?utm_source=item-share-cb";
 
 interface SettingsProps {
   prayerData: PrayerData;
-  notificationsEnabled: boolean;
-  notificationStatus: 'default' | 'granted' | 'denied';
-  onNotificationToggle: (checked: boolean) => Promise<void>;
   translations: any;
 }
 
 export const Settings = memo(({
   prayerData,
-  notificationsEnabled,
-  notificationStatus,
-  onNotificationToggle,
   translations: t
 }: SettingsProps) => {
   return (
     <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card className="shadow-md">
+      {/* Extension Reminders Card (Replaces the browser notifications switch) */}
+      <Card className="shadow-md bg-card border-border">
         <CardHeader>
-            <CardTitle className="font-bold">{t.prayerNotifications}</CardTitle>
-            <CardDescription>{t.notificationDesc}</CardDescription>
+            <CardTitle className="font-bold flex items-center gap-2">
+              <Bell className="w-5 h-5 text-accent" />
+              <span>{t.prayerNotifications || "إشعارات الصلاة"}</span>
+            </CardTitle>
+            <CardDescription>
+              {t.notificationsViaExtensionDesc || "لتلقي تنبيهات وإشعارات الأذان في وقتها بدقة أثناء التصفح، يمكنك تثبيت إضافة رفيق الصلاة لمتصفح Chrome."}
+            </CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="flex items-center justify-between">
-                <Label htmlFor="notifications" className="flex items-center gap-3 cursor-pointer">
-                    <Bell className="w-6 h-6 text-accent"/>
-                    <span className="text-lg font-semibold">{t.enableNotifications}</span>
-                </Label>
-                <Switch 
-                  id="notifications" 
-                  checked={notificationsEnabled} 
-                  onCheckedChange={onNotificationToggle}
-                  disabled={notificationStatus === 'denied'}
-                  aria-label="Enable prayer notifications" 
-                />
-            </div>
+            <a
+              href={CHROME_EXTENSION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-accent text-accent-foreground font-bold hover:brightness-105 transition shadow-sm text-sm"
+            >
+              <Chrome className="w-4 h-4" />
+              <span>{t.addToChrome || "أضف رفيق الصلاة إلى Chrome لتفعيل التذكيرات"}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
         </CardContent>
       </Card>
-      <Card className="shadow-md">
+
+      {/* Calculation Info Card (Exact original) */}
+      <Card className="shadow-md bg-card border-border">
         <CardHeader>
             <CardTitle className="font-bold">{t.calculationInfo}</CardTitle>
             <CardDescription>{t.calculationMethodDesc}</CardDescription>

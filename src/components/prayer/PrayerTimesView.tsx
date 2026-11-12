@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { PrayerData } from '@/types/prayer';
-import { getPrayerList, findNextPrayer, formatCountdown, type Prayer } from '@/lib/time';
+import { getPrayerList, findNextPrayer, formatCountdown } from '@/lib/time';
 import { useCurrentTime } from '@/hooks/useCurrentTime';
 
 import { LocationDisplay } from './LocationDisplay';
@@ -15,9 +14,6 @@ interface PrayerTimesViewProps {
   prayerData: PrayerData;
   displayLocation: string;
   onLocationSet: (country: string, city: string) => void;
-  notificationsEnabled: boolean;
-  notificationStatus: 'default' | 'granted' | 'denied';
-  handleNotificationToggle: (checked: boolean) => Promise<void>;
   translations: any;
   language: 'ar' | 'en';
 }
@@ -26,9 +22,6 @@ export const PrayerTimesView = ({
   prayerData,
   displayLocation,
   onLocationSet,
-  notificationsEnabled,
-  notificationStatus,
-  handleNotificationToggle,
   language,
   translations: t,
 }: PrayerTimesViewProps) => {
@@ -51,7 +44,6 @@ export const PrayerTimesView = ({
     if (!prayerData) return "";
     const { date } = prayerData;
     const locale = language === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US-u-ca-islamic';
-    // Use the reliable timestamp to create the date object
     const dateObj = new Date(parseInt(date.timestamp, 10) * 1000);
     return new Intl.DateTimeFormat(locale, {
         weekday: 'long',
@@ -82,7 +74,6 @@ export const PrayerTimesView = ({
     return prayerList.filter(p => p.name !== 'Sunrise' && p.name !== 'Sunset');
   }, [prayerList]);
 
-
   return (
     <>
       <LocationDisplay
@@ -110,9 +101,6 @@ export const PrayerTimesView = ({
 
       <Settings
         prayerData={prayerData}
-        notificationsEnabled={notificationsEnabled}
-        notificationStatus={notificationStatus}
-        onNotificationToggle={handleNotificationToggle}
         translations={t}
       />
     </>

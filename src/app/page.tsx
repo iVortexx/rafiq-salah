@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { usePrayerTimes } from '@/hooks/usePrayerTimes';
-import { useNotifications } from '@/hooks/useNotifications';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 
 import { Header } from '@/components/prayer/Header';
@@ -14,19 +13,17 @@ import type { Settings } from '@/types/prayer';
 import { countries } from '@/lib/locations';
 import { useToast } from '@/hooks/use-toast';
 
-
 const defaultSettings: Settings = {
   location: null,
-  notifications: true,
+  notifications: false,
   calculationMethod: 'mwl',
   juristicMethod: 'standard',
   highLatitudeAdjustment: 'none',
   hourAdjustment: 0,
   prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
   language: 'ar',
-  theme: 'light',
+  theme: 'dark', // Extension dark palette by default
 };
-
 
 export default function Home() {
   const [settings, setSettings, settingsHydrated] = useLocalStorage<Settings>('settings', defaultSettings);
@@ -45,13 +42,6 @@ export default function Home() {
     setAppState,
     setError,
   } = usePrayerTimes(settings, language, t);
-
-  const {
-    notificationsEnabled,
-    notificationStatus,
-    handleNotificationToggle: hookHandleNotificationToggle,
-  } = useNotifications(t);
-
 
   useEffect(() => {
     if (!settingsHydrated) return; // Wait for settings to load from localStorage
@@ -84,7 +74,7 @@ export default function Home() {
         setAppState('geo-fallback');
       }
     }
-  }, [settingsHydrated]); // Run only once when settings are loaded
+  }, [settingsHydrated]);
 
   const handleManualLocationSelect = (countryName: string, cityName: string) => {
     const countryData = countries.find(c => c.name === countryName || c.arabicName === countryName);
@@ -129,19 +119,13 @@ export default function Home() {
     }
   };
 
-  const handleNotificationToggleHome = async (checked: boolean): Promise<void> => {
-    setSettings({ ...settings, notifications: checked });
-    await hookHandleNotificationToggle(checked);
-  };
-  
   const handleLanguageChange = (lang: 'ar' | 'en') => {
     setSettings(prev => ({...prev, language: lang}));
-  }
+  };
 
   const handleThemeChange = (theme: 'light' | 'dark') => {
     setSettings(prev => ({...prev, theme: theme}));
-  }
-
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -170,15 +154,12 @@ export default function Home() {
             prayerData={prayerData}
             displayLocation={displayLocation}
             onLocationSet={handleManualLocationSelect}
-            notificationsEnabled={settings.notifications}
-            notificationStatus={notificationStatus}
-            handleNotificationToggle={handleNotificationToggleHome}
             translations={t}
             language={language}
           />
         )}
       </main>
-      <footer className="text-center py-6 border-t mt-8">
+      <footer className="text-center py-6 border-t mt-8 border-border">
         <p className="text-sm text-muted-foreground">
           {t.apiCredit}{' '}
           <a
@@ -188,6 +169,15 @@ export default function Home() {
             className="underline hover:text-primary"
           >
             Aladhan API
+          </a>
+          {' • '}
+          <a
+            href="https://chromewebstore.google.com/detail/afcbeklnhcpfeokpdjgmlnlnemejajgc?utm_source=item-share-cb"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline font-semibold"
+          >
+            {language === 'ar' ? 'إضافة رفيق الصلاة لـ Chrome' : 'Prayer Pal Chrome Extension'}
           </a>
         </p>
       </footer>

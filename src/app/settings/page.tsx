@@ -2,9 +2,8 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Bell, Clock, Sun, MapPin, Loader2, Save, RotateCcw } from "lucide-react"
+import { Bell, Clock, MapPin, Loader2, Save, RotateCcw, Chrome, ExternalLink } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -17,16 +16,18 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from "@/components/ui/button"
 import type { Settings } from "@/types/prayer"
 
+const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/afcbeklnhcpfeokpdjgmlnlnemejajgc?utm_source=item-share-cb";
+
 const defaultSettings: Settings = {
   location: null,
-  notifications: true,
+  notifications: false,
   calculationMethod: 'default',
   juristicMethod: 'standard',
   highLatitudeAdjustment: 'none',
   hourAdjustment: 0,
   prayerAdjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
   language: 'ar',
-  theme: 'light',
+  theme: 'dark',
 };
 
 export default function PrayerSettingsPage() {
@@ -183,7 +184,7 @@ export default function PrayerSettingsPage() {
     if (!countryData || !cityData) return t.noLocationSaved;
     
     return language === 'ar' 
-      ? `${cityData.arabicName}, ${countryData.arabicName}`
+      ? `${cityData.arabicName}، ${countryData.arabicName}`
       : `${cityData.name}, ${countryData.name}`;
 
   }, [localSettings.location, language, t]);
@@ -204,13 +205,13 @@ export default function PrayerSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
+                <MapPin className="h-5 w-5 text-accent" />
                 {t.locationSettings}
               </CardTitle>
               <CardDescription>{t.locationSettingsDesc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button type="button" className="w-full" onClick={handleUseCurrentLocation} disabled={locationLoading}>
+              <Button type="button" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold" onClick={handleUseCurrentLocation} disabled={locationLoading}>
                 {locationLoading ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : <MapPin className="ms-2 h-4 w-4" />}
                 {t.useCurrentLocation}
               </Button>
@@ -340,36 +341,39 @@ export default function PrayerSettingsPage() {
           </Card>
 
 
-          {/* Notifications */}
+          {/* Notifications via Chrome Extension */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
+                <Bell className="h-5 w-5 text-accent" />
                 {t.notifications}
               </CardTitle>
-              <CardDescription>{t.notificationsDesc}</CardDescription>
+              <CardDescription>
+                {t.notificationsViaExtensionDesc || "لتلقي تنبيهات وإشعارات الأذان في وقتها بدقة أثناء التصفح، يمكنك تثبيت إضافة رفيق الصلاة لمتصفح Chrome."}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notifications" className="text-base font-medium">
-                    {t.enableNotifications}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">{t.enableNotificationsDesc}</p>
-                </div>
-                <Switch id="notifications" checked={localSettings.notifications} onCheckedChange={(v) => handleSettingChange('notifications', v)} />
-              </div>
+              <a
+                href={CHROME_EXTENSION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 bg-accent text-accent-foreground font-bold py-2.5 px-4 rounded-lg shadow-sm hover:brightness-105 transition text-sm"
+              >
+                <Chrome className="w-4 h-4" />
+                <span>{t.addToChrome || "أضف رفيق الصلاة إلى Chrome"}</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
             </CardContent>
           </Card>
 
           {/* Save Button */}
           <div className="flex flex-col-reverse sm:flex-row justify-center items-center gap-4 pt-4">
             <Button type="button" variant="outline" className="w-full" onClick={handleRestoreDefaults}>
-              <RotateCcw />
+              <RotateCcw className="me-2 h-4 w-4" />
               {t.restoreDefaults}
             </Button>
-            <Button className="w-full" onClick={handleSaveSettings}>
-                <Save />
+            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold" onClick={handleSaveSettings}>
+                <Save className="me-2 h-4 w-4" />
                 {t.saveSettings}
             </Button>
           </div>

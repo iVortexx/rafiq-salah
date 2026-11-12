@@ -41,13 +41,13 @@ const LanguageSwitcher = memo(({ language, setLanguage }: LanguageSwitcherProps)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="flex items-center gap-2 px-2">
-          <Languages className="h-5 w-5" />
+        <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-secondary">
+          <Languages className="h-5 w-5 text-muted-foreground" />
           <span className="uppercase font-bold">{language}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="bg-popover border-border">
         <DropdownMenuItem onClick={() => setLanguage("ar")} className="gap-2 cursor-pointer">
           <EgyptFlag />
           <span>العربية</span>
@@ -74,9 +74,9 @@ const ThemeSwitcher = memo(({ theme, setTheme }: ThemeSwitcherProps) => {
   }
 
   return (
-    <Button onClick={toggleTheme} variant="ghost" size="icon">
-      <SunIcon className="h-6 w-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <MoonIcon className="absolute h-6 w-6 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    <Button onClick={toggleTheme} variant="ghost" size="icon" className="hover:bg-secondary">
+      <SunIcon className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground" />
+      <MoonIcon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-accent" />
       <span className="sr-only">Toggle theme</span>
     </Button>
   )
@@ -101,15 +101,15 @@ export const Header = memo(({ title, language, setLanguage, theme, setTheme }: H
     <header className="container mx-auto px-4 py-4 flex justify-between items-center">
       <div className="flex items-center gap-3">
         <Link href="/" aria-label="Home">
-          <HomeIcon className="h-6 w-6 text-muted-foreground hover:text-primary transition" />
+          <HomeIcon className="h-6 w-6 text-muted-foreground hover:text-accent transition" />
         </Link>
-        <h1 className="text-2xl font-bold text-primary">{title}</h1>
+        <h1 className="text-2xl font-extrabold text-accent tracking-tight">{title}</h1>
       </div>
       <div className="flex items-center gap-2">
         <LanguageSwitcher language={language} setLanguage={setLanguage} />
         <ThemeSwitcher theme={theme} setTheme={setTheme} />
         <Link href="/settings" aria-label="Settings" className="ml-2">
-          <SettingsIcon className="h-6 w-6 text-muted-foreground hover:text-primary transition" />
+          <SettingsIcon className="h-6 w-6 text-muted-foreground hover:text-accent transition" />
         </Link>
       </div>
     </header>
